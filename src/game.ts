@@ -18,19 +18,26 @@ class Game {
         this.addShape("#FF0000", 0); // Red block in slot 0
     }
 
-    addShape(color: string, slot: number) {
+    addShape(color: string, slot: number): Shape {
         let x = this.blockSlotStart + slot * (this.blockSlotWidth + this.blockSlotGap);
         let shapePosition = new CoordinatePair(x, this.blockHeight);
         let positions = randomShape();
         let shape = new Shape(this.rootScene, shapePosition, positions, color, this.shapeDropped);
+        return shape;
     }
 
     shapeDropped(shape: Shape) {
-        this.addShape("#FF0000", 0); // Add another shape after one is dropped
+        let newShape = this.addShape("#FF0000", 0); // Add another shape after one is dropped
         let cellsToClear: Cell[] = [];
         cellsToClear = this.getCompleteRowCells();
         cellsToClear = cellsToClear.concat(this.getCompleteColumnCells());
         this.clearCells(cellsToClear);
+        let fitPositions = this.checkForFitCoordinates(newShape);
+        if (fitPositions.length == 0) {
+            setTimeout(() => {
+                alert("Game Over!");
+            }, 1000);
+        }
     }
 
     getRowCellsIfComplete(row: number): Cell[] {
@@ -86,5 +93,18 @@ class Game {
                 cell.element.style.backgroundColor = "lightgrey";
             }
         }
+    }
+
+    checkForFitCoordinates(shape: Shape): CoordinatePair[] {
+        let validPositions: CoordinatePair[] = [];
+        for (let r = 0; r < this.n; r++) {
+            for (let c = 0; c < this.n; c++) {
+                let cells = shape.findCells(r, c);
+                if (cells) {
+                    validPositions.push(new CoordinatePair(r, c));
+                }
+            }
+        }
+        return validPositions;
     }
 }

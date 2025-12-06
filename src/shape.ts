@@ -71,6 +71,7 @@ class Shape {
     }
 
     onMouseDown(event: MouseEvent) {
+        document.removeEventListener("mousemove", this.onMouseMove);
         event.preventDefault();
         if (!this.element) return;
         let rect = this.element.getBoundingClientRect();

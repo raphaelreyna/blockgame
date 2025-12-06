@@ -95,13 +95,13 @@ class Game {
         }
     }
 
-    checkForFitCoordinates(shape: Shape): CoordinatePair[] {
-        let validPositions: CoordinatePair[] = [];
+    checkForFitCoordinates(shape: Shape): Cell[][] {
+        let validPositions: Cell[][] = [];
         for (let r = 0; r < this.n; r++) {
             for (let c = 0; c < this.n; c++) {
                 let cells = shape.findCells(r, c);
                 if (cells) {
-                    validPositions.push(new CoordinatePair(r, c));
+                    validPositions.push(cells);
                 }
             }
         }

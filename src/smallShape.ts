@@ -2,6 +2,7 @@
 /// <reference path="grid.ts" />
 
 type SmallShapeConfig = {
+    index: number;
     parentElement: HTMLElement;
     position: CoordinatePair;
     n: number;
@@ -18,11 +19,13 @@ class SmallShape {
     parentElement: HTMLElement;
     positions: CoordinatePair[];
     position: CoordinatePair;
-    color: string = "red";
+    color: string;
+    index: number;
     callback: (smallShape: SmallShape) => void;
     constructor(config: SmallShapeConfig) {
         this.handleMouseDown = this.handleMouseDown.bind(this);
 
+        this.index = config.index;
         this.n = config.n;
         this.size = config.size;
         this.callback = config.callback;

@@ -3,31 +3,47 @@
 /// <reference path="grid.ts" />
 /// <reference path="rootScene.ts" />
 
+type ShapeConfig = {
+    index: number;
+    rootScene: RootScene;
+    position: CoordinatePair;
+    positions: CoordinatePair[];
+    color: string;
+    dropCallback: (success: boolean, shape: Shape) => void;
+}
+
 class Shape {
     element: HTMLDivElement;
     elements: HTMLDivElement[];
     offsetX: number = 0;
     offsetY: number = 0;
-    callback: (shape: Shape) => void;
-    constructor(public rootScene: RootScene, position: CoordinatePair, public positions: CoordinatePair[], color: string, callback: (shape: Shape) => void) {
+    index: number = 0;
+    originalPosition: CoordinatePair;
+    rootScene: RootScene;
+    positions: CoordinatePair[]
+    color: string;
+    dropCallback: (success: boolean, shape: Shape) => void;
+    constructor(config : ShapeConfig) {
         this.onMouseDown = this.onMouseDown.bind(this);
         this.onMouseUp = this.onMouseUp.bind(this);
         this.onMouseMove = this.onMouseMove.bind(this);
         document.addEventListener("mousemove", this.onMouseMove);
         document.addEventListener("mousedown", this.onMouseDown);
+        document.addEventListener("mouseup", this.onMouseUp);
 
-        this.callback = callback;
-        this.rootScene = rootScene;
-        this.positions = positions;
+        this.index = config.index;
+        this.dropCallback = config.dropCallback;
+        this.rootScene = config.rootScene;
+        this.positions = config.positions;
+        this.color = config.color;
+        this.originalPosition = { x: config.position.x, y: config.position.y };
         this.element = document.createElement("div");
         this.element.style.position = "absolute";
-        this.element.style.width = `${rootScene.grid.size}px`;
+        this.element.style.width = `${this.rootScene.grid.size}px`;
         this.element.style.height = this.element.style.width;
-        this.element.style.top = `${position.y}px`;
-        this.element.style.left = `${position.x}px`;
+        this.element.style.top = `${config.position.y}px`;
+        this.element.style.left = `${config.position.x}px`;
         this.element.classList.add("shapeContainer");
-        document.addEventListener("mouseup", this.onMouseUp);
-        document.addEventListener("mousedown", this.onMouseDown);
         this.rootScene.element.appendChild(this.element);
         this.elements = [];
 
@@ -35,15 +51,15 @@ class Shape {
         let minY: number = 1000000;
         let maxX: number = -1;
         let maxY: number = -1;
-        for (let p of positions) {
+        for (let p of this.positions) {
             if (p.x > maxX) maxX = p.x;
             if (p.y < minY) minY = p.y;
             if (p.x < minX) minX = p.x;
             if (p.y > maxY) maxY = p.y;
             let element = document.createElement("div");
-            element.style.width = `${rootScene.grid.cellSize}px`
-            element.style.height = `${rootScene.grid.cellSize}px`
-            element.style.backgroundColor = color;
+            element.style.width = `${this.rootScene.grid.cellSize}px`
+            element.style.height = `${this.rootScene.grid.cellSize}px`
+            element.style.backgroundColor = config.color;
             element.style.position = "absolute";
             let {x, y} = this.toWorldCoordinates(p.y, p.x);
             element.style.top = `${y}px`;
@@ -72,6 +88,15 @@ class Shape {
         return { x, y };
     }
 
+    remove() {
+        document.removeEventListener("mousedown", this.onMouseDown);
+        document.removeEventListener("mouseup", this.onMouseUp);
+        document.removeEventListener("mousemove", this.onMouseMove);
+        if (this.element) {
+            this.rootScene.element.removeChild(this.element);
+        }
+    }
+
     onMouseDown(event: MouseEvent) {
         document.removeEventListener("mousemove", this.onMouseMove);
         event.preventDefault();
@@ -91,6 +116,7 @@ class Shape {
         let cells = this.findCells(row, col);
         if (!cells) {
             console.log("cant place shape");
+            this.dropCallback(false, this);
             return;
         }
         for (let cell of cells) {
@@ -99,14 +125,11 @@ class Shape {
                 cell.occupied = true;
             }
         }
-        document.removeEventListener("mousedown", this.onMouseDown);
-        document.removeEventListener("mouseup", this.onMouseUp);
-        this.rootScene.element.removeChild(this.element);
-        this.callback(this);
+        this.dropCallback(true, this);
     }
     onMouseMove(event: MouseEvent) {
-        if (!this.element) return;
         event.preventDefault();
+        if (!this.element) return;
 
         let x = this.element.offsetLeft;
         let y = this.element.offsetTop;

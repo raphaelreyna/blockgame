@@ -111,9 +111,10 @@ class Shape extends GameNode {
             }
         }
 
-        // move shape
-        this.element.style.left = `${event.clientX - this.offsetX}px`;
-        this.element.style.top = `${event.clientY - this.offsetY}px`;
+        // move shape - account for container offset from viewport
+        let containerRect = this.rootScene.element.getBoundingClientRect();
+        this.element.style.left = `${event.clientX - containerRect.left - this.offsetX}px`;
+        this.element.style.top = `${event.clientY - containerRect.top - this.offsetY}px`;
 
         // highlight new drop area
         x = this.element.offsetLeft;

@@ -7,23 +7,25 @@ type ShapeConfig = {
     index: number;
     rootScene: RootScene;
     position: CoordinatePair;
-    positions: CoordinatePair[];
+    figure: Figure;
     color: string;
-    dropCallback: (success: boolean, shape: Shape) => void;
+    dropCallback: (shape: Shape, cells: Cell[]) => void;
 }
 
-class Shape {
-    element: HTMLDivElement;
-    elements: HTMLDivElement[];
+class Shape extends GameNode {
+    elements: GameNode[];
     offsetX: number = 0;
     offsetY: number = 0;
     index: number = 0;
     originalPosition: CoordinatePair;
     rootScene: RootScene;
-    positions: CoordinatePair[]
+    figure: Figure;
     color: string;
-    dropCallback: (success: boolean, shape: Shape) => void;
+    dropCallback: (shape: Shape, cells: Cell[]) => void;
     constructor(config : ShapeConfig) {
+        let width = config.rootScene.grid.size;
+        let height = width;
+        super({ x: config.position.x, y: config.position.y, width: width, height: height });
         this.onMouseDown = this.onMouseDown.bind(this);
         this.onMouseUp = this.onMouseUp.bind(this);
         this.onMouseMove = this.onMouseMove.bind(this);
@@ -34,58 +36,25 @@ class Shape {
         this.index = config.index;
         this.dropCallback = config.dropCallback;
         this.rootScene = config.rootScene;
-        this.positions = config.positions;
+        this.figure = config.figure;
         this.color = config.color;
         this.originalPosition = { x: config.position.x, y: config.position.y };
-        this.element = document.createElement("div");
-        this.element.style.position = "absolute";
-        this.element.style.width = `${this.rootScene.grid.size}px`;
-        this.element.style.height = this.element.style.width;
-        this.element.style.top = `${config.position.y}px`;
-        this.element.style.left = `${config.position.x}px`;
         this.element.classList.add("shapeContainer");
-        this.rootScene.element.appendChild(this.element);
+        this.addToParent(this.rootScene.element);
         this.elements = [];
 
-        let minX: number = 1000000;
-        let minY: number = 1000000;
-        let maxX: number = -1;
-        let maxY: number = -1;
-        for (let p of this.positions) {
-            if (p.x > maxX) maxX = p.x;
-            if (p.y < minY) minY = p.y;
-            if (p.x < minX) minX = p.x;
-            if (p.y > maxY) maxY = p.y;
-            let element = document.createElement("div");
-            element.style.width = `${this.rootScene.grid.cellSize}px`
-            element.style.height = `${this.rootScene.grid.cellSize}px`
-            element.style.backgroundColor = config.color;
-            element.style.position = "absolute";
-            let {x, y} = this.toWorldCoordinates(p.y, p.x);
-            element.style.top = `${y}px`;
-            element.style.left = `${x}px`;
-            element.classList.add("shape-section");
-            this.elements.push(element);
-            this.element.appendChild(element);
-        }
+        const grid = this.rootScene.grid;
+        let sectionsNodes = this.figure.toGameNodes(grid.size, grid.n, grid.cellSize);
+        sectionsNodes.forEach(node => {
+            node.element.classList.add("shape-section");
+            node.element.style.backgroundColor = this.color;
+            this.elements.push(node);
+            node.addToParent(this.element);
+        });
 
-        if (minX != 0 || minY != 0) {
-            throw new Error("invalid shape");
-        }
-
-        let { x: maxXWorld, y: maxYWorld } = this.toWorldCoordinates(maxY + 1, maxX + 1);
+        let { x: maxXWorld, y: maxYWorld } = gridToWorldCoordinates(grid.n, grid.size, this.figure.height, this.figure.width);
         this.element.style.width = `${maxXWorld}px`;
         this.element.style.height = `${maxYWorld}px`;
-    }
-
-    toWorldCoordinates(row: number, col: number): { x: number; y: number } {
-        const n = this.rootScene.grid.n;
-        const size = this.rootScene.grid.size;
-        let x = col / n;
-        x = x * size;
-        let y = row / n;
-        y = y * size;
-        return { x, y };
     }
 
     remove() {
@@ -116,16 +85,13 @@ class Shape {
         let cells = this.findCells(row, col);
         if (!cells) {
             console.log("cant place shape");
-            this.dropCallback(false, this);
+            this.dropCallback(this, []);
             return;
         }
         for (let cell of cells) {
-            if (cell.element) {
-                cell.element.style.backgroundColor = "brown";
-                cell.occupied = true;
-            }
+            cell.setDropHighlighted(false);
         }
-        this.dropCallback(true, this);
+        this.dropCallback(this, cells);
     }
     onMouseMove(event: MouseEvent) {
         event.preventDefault();
@@ -133,19 +99,23 @@ class Shape {
 
         let x = this.element.offsetLeft;
         let y = this.element.offsetTop;
+        
+        // undo previous drop-highlight
         let { row, col } = this.rootScene.grid.toGridCoordinates(y, x);
         let cells = this.findCells(row, col);
         if (cells) {
             for (let cell of cells) {
                 if (cell.element) {
-                    cell.element.style.backgroundColor = "lightgrey";
+                    cell.setDropHighlighted(false);
                 }
             }
         }
 
+        // move shape
         this.element.style.left = `${event.clientX - this.offsetX}px`;
         this.element.style.top = `${event.clientY - this.offsetY}px`;
 
+        // highlight new drop area
         x = this.element.offsetLeft;
         y = this.element.offsetTop;
         let { row: newRow, col: newCol } = this.rootScene.grid.toGridCoordinates(y, x);
@@ -155,21 +125,12 @@ class Shape {
         }
         for (let cell of cells) {
             if (cell.element) {
-                cell.element.style.backgroundColor = "yellow";
+                cell.setDropHighlighted(true);
             }
         }
     }
+
     findCells(x: number, y: number): Cell[] | null {
-        let cells: Cell[] = [];
-        for (let sectionPosition of this.positions) {
-            let xx = x + sectionPosition.x;
-            let yy = y + sectionPosition.y;
-            let cell = this.rootScene.grid.getCell(yy, xx);
-            if (!cell || !cell.element || cell.occupied) {
-                return null;
-            }
-            cells = cells.concat(cell);
-        }
-        return cells;
+        return this.rootScene.grid.findFigureIntersection(this.figure, new CoordinatePair(x, y));
     }
 }

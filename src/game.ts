@@ -33,7 +33,7 @@ class Game {
         let smallShapeConfig: SmallShapeConfig = { 
             index: slot,
             color: color, 
-            positions: positions, 
+            figure: new Figure(positions),
             parentElement: this.rootScene.element,
             position: shapePosition,
             n: this.n,
@@ -46,29 +46,33 @@ class Game {
 
     handleSmallShapeClick(smallShape: SmallShape) {
         let position = smallShape.position;
-        let positions = smallShape.positions;
+        let figure = smallShape.figure;
         let color = smallShape.color;
         this.rootScene.element.removeChild(smallShape.element);
         let shapeConfig: ShapeConfig = { 
             index: smallShape.index,
             rootScene: this.rootScene,
             position: position,
-            positions: positions,
+            figure: figure,
             color: color,
             dropCallback: this.shapeDropped
         };
         let shape = new Shape(shapeConfig);
     }
 
-    shapeDropped(success: boolean, shape: Shape) {
-        if (!success) {
-            this.addShape(shape.color, shape.index, shape.positions);
+    shapeDropped(shape: Shape, cells: Cell[]) {
+        if (cells.length == 0) {
+            this.addShape(shape.color, shape.index, shape.figure.data);
             shape.remove();
             return;
         }
 
-        const grid = this.rootScene.grid;
+        // Change color of occupied cells to brown
+        for (let cell of cells) {
+            cell.setOccupied(true, shape.color);
+        }
 
+        const grid = this.rootScene.grid;
         let newShape = this.addShape(getRandomUnconstrainedColor(), shape.index); // Add another shape after one is dropped
         shape.remove();
         let cellsToClear: Cell[] = [];
@@ -88,7 +92,7 @@ class Game {
         let grid = this.rootScene.grid;
         for (let r = 0; r < this.n; r++) {
             for (let c = 0; c < this.n; c++) {
-                let cells = shape.findCells(grid, r, c);
+                let cells = grid.findFigureIntersection(shape.figure, new CoordinatePair(c, r));
                 if (cells) {
                     validPositions.push(cells);
                 }

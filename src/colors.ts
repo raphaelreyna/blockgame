@@ -3,8 +3,6 @@ const COLORS: { [key: string]: string } = {
   blue: '#0000FF',
   green: '#008000',
   yellow: '#FFFF00',
-  black: '#000000',
-  white: '#FFFFFF'
 };
 
 function getColor(colorName: string): string {

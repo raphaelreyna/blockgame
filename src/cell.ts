@@ -1,10 +1,25 @@
+type CellConfig = {
+    row: number;
+    col: number;
+    size: number;
+};
+
 class Cell {
     neighbors: Map<string, Cell> = new Map();
     occupied: boolean = false;
-    element: HTMLDivElement | null = null;
-    constructor(public row: number, public col: number) {
-        this.row = row;
-        this.col = col;
+    element: HTMLDivElement;
+    row: number;
+    col: number;
+    constructor(config: CellConfig) {
+        this.row = config.row;
+        this.col = config.col;
+        this.element = document.createElement("div");
+        this.element.classList.add("grid-cell");
+        this.element.style.position = "absolute";
+        this.element.style.width = `${config.size}px`;
+        this.element.style.height = `${config.size}px`;
+        this.element.style.left = `${config.col * config.size}px`;
+        this.element.style.top = `${config.row * config.size}px`;
     }
 
     addNeighbor(direction: string, cell: Cell) {
@@ -27,5 +42,26 @@ class Cell {
                 throw new Error(`Invalid direction: ${direction}`);
         }
         cell.neighbors.set(neighbotDirection, this);
+    }
+
+    setOccupied(occupied: boolean, color: string = "") {
+        this.occupied = occupied;
+        if (occupied) {
+            this.element?.classList.add("occupied-grid-cell");
+            if (color) {
+                this.element.style.backgroundColor = color;
+            }
+        } else {
+            this.element?.classList.remove("occupied-grid-cell");
+            this.element.style.backgroundColor = "";
+        }
+    }
+
+    setDropHighlighted(highlighted: boolean) {
+        if (highlighted) {
+            this.element?.classList.add("drop-highlighted-grid-cell");
+        } else {
+            this.element?.classList.remove("drop-highlighted-grid-cell");
+        }
     }
 }

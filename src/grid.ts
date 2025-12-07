@@ -7,25 +7,21 @@ class Grid {
     cellSize: number;
     constructor(public n: number, public size: number) {
         this.cellSize = size / n;
-        console.log(`Cell size: ${this.cellSize}`);
-        this.element.style.backgroundColor = "lightgrey";
+        this.element.classList.add("grid");
         this.element.style.width = `${size}px`;
         this.element.style.height = `${size}px`;
 
         this.cells = [];
         for (let r = 0; r < n; r++) {
             for (let c = 0; c < n; c++) {
-                let cell = document.createElement("div");
-                cell.style.position = "absolute";
-                cell.style.width = `${this.cellSize}px`;
-                cell.style.height = `${this.cellSize}px`;
-                cell.style.left = `${(c * this.cellSize)}px`;
-                cell.style.top = `${(r * this.cellSize)}px`;
-                cell.style.border = "1px solid rgba(0,0,0,0.1)";
-                let cellObj = new Cell(r, c);
-                cellObj.element = cell;
+                const cellConfig: CellConfig = {
+                    row: r,
+                    col: c,
+                    size: this.cellSize,
+                }
+                let cellObj = new Cell(cellConfig);
                 this.cells.push(cellObj);
-                this.element.appendChild(cell);
+                this.element.appendChild(cellObj.element);
             }
         }
 
@@ -118,9 +114,22 @@ class Grid {
     clearCells(cells: Cell[]) {
         for (let cell of cells) {
             if (cell && cell.element) {
-                cell.occupied = false;
-                cell.element.style.backgroundColor = "lightgrey";
+                cell.setOccupied(false);
             }
         }
+    }
+
+    findFigureIntersection(figure: Figure, position: CoordinatePair): Cell[] | null {
+        let cells: Cell[] = [];
+        for (let sectionPosition of figure.data) {
+            let x = position.x + sectionPosition.x;
+            let y = position.y + sectionPosition.y;
+            let cell = this.getCell(y, x);
+            if (!cell || !cell.element || cell.occupied) {
+                return null;
+            }
+            cells = cells.concat(cell);
+        }
+        return cells;
     }
 }

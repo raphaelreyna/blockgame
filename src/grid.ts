@@ -47,10 +47,10 @@ class Grid {
     toGridCoordinates(x: number, y: number): { row: number; col: number } {
         let col = x / this.size;
         col = col * this.n;
-        col = Math.floor(col);
+        col = Math.round(col);
         let row = y / this.size;
         row = row * this.n;
-        row = Math.floor(row);
+        row = Math.round(row);
         return { row, col };
     }
 

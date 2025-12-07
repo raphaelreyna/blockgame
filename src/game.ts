@@ -67,72 +67,19 @@ class Game {
             return;
         }
 
+        const grid = this.rootScene.grid;
+
         let newShape = this.addShape(getRandomUnconstrainedColor(), shape.index); // Add another shape after one is dropped
         shape.remove();
         let cellsToClear: Cell[] = [];
-        cellsToClear = this.getCompleteRowCells();
-        cellsToClear = cellsToClear.concat(this.getCompleteColumnCells());
-        this.clearCells(cellsToClear);
+        cellsToClear = grid.getCompleteRowCells();
+        cellsToClear = cellsToClear.concat(grid.getCompleteColumnCells());
+        grid.clearCells(cellsToClear);
         let fitPositions = this.checkForFitCoordinates(newShape);
         if (fitPositions.length == 0) {
             setTimeout(() => {
                 alert("Game Over!");
             }, 1000);
-        }
-    }
-
-    getRowCellsIfComplete(row: number): Cell[] {
-        let cells: Cell[] = [];
-        for (let c = 0; c < this.n; c++) {
-            let cell = this.rootScene.grid.getCell(row, c);
-            if (cell && !cell.occupied) {
-                return [];
-            }
-            cells.push(cell!);
-        }
-        return cells;
-    }
-
-    getCompleteRowCells(): Cell[] {
-        let cells: Cell[] = [];
-        for (let r = 0; r < this.n; r++) {
-            let x = this.getRowCellsIfComplete(r);
-            if (x.length > 0) {
-                cells = cells.concat(x);
-            }
-        }
-        return cells;
-    }
-
-    getColumnCellsIfComplete(col: number): Cell[] {
-        let cells: Cell[] = [];
-        for (let r = 0; r < this.n; r++) {
-            let cell = this.rootScene.grid.getCell(r, col);
-            if (cell && !cell.occupied) {
-                return [];
-            }
-            cells.push(cell!);
-        }
-        return cells;
-    }
-    
-    getCompleteColumnCells(): Cell[] {
-        let cells: Cell[] = [];
-        for (let c = 0; c < this.n; c++) {
-            let x = this.getColumnCellsIfComplete(c);
-            if (x.length > 0) {
-                cells = cells.concat(x);
-            }
-        }
-        return cells;
-    }
-
-    clearCells(cells: Cell[]) {
-        for (let cell of cells) {
-            if (cell && cell.element) {
-                cell.occupied = false;
-                cell.element.style.backgroundColor = "lightgrey";
-            }
         }
     }
 

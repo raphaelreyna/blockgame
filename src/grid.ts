@@ -68,4 +68,59 @@ class Grid {
         }
         return this.cells[row * this.n + col];
     }
+
+    getRowCellsIfComplete(row: number): Cell[] {
+        let cells: Cell[] = [];
+        for (let c = 0; c < this.n; c++) {
+            let cell = this.getCell(row, c);
+            if (cell && !cell.occupied) {
+                return [];
+            }
+            cells.push(cell!);
+        }
+        return cells;
+    }
+
+    getCompleteRowCells(): Cell[] {
+        let cells: Cell[] = [];
+        for (let r = 0; r < this.n; r++) {
+            let x = this.getRowCellsIfComplete(r);
+            if (x.length > 0) {
+                cells = cells.concat(x);
+            }
+        }
+        return cells;
+    }
+
+    getColumnCellsIfComplete(col: number): Cell[] {
+        let cells: Cell[] = [];
+        for (let r = 0; r < this.n; r++) {
+            let cell = this.getCell(r, col);
+            if (cell && !cell.occupied) {
+                return [];
+            }
+            cells.push(cell!);
+        }
+        return cells;
+    }
+    
+    getCompleteColumnCells(): Cell[] {
+        let cells: Cell[] = [];
+        for (let c = 0; c < this.n; c++) {
+            let x = this.getColumnCellsIfComplete(c);
+            if (x.length > 0) {
+                cells = cells.concat(x);
+            }
+        }
+        return cells;
+    }
+
+    clearCells(cells: Cell[]) {
+        for (let cell of cells) {
+            if (cell && cell.element) {
+                cell.occupied = false;
+                cell.element.style.backgroundColor = "lightgrey";
+            }
+        }
+    }
 }

@@ -107,8 +107,34 @@ class Shape {
     onMouseMove(event: MouseEvent) {
         if (!this.element) return;
         event.preventDefault();
+
+        let x = this.element.offsetLeft;
+        let y = this.element.offsetTop;
+        let { row, col } = this.rootScene.grid.toGridCoordinates(y, x);
+        let cells = this.findCells(row, col);
+        if (cells) {
+            for (let cell of cells) {
+                if (cell.element) {
+                    cell.element.style.backgroundColor = "lightgrey";
+                }
+            }
+        }
+
         this.element.style.left = `${event.clientX - this.offsetX}px`;
         this.element.style.top = `${event.clientY - this.offsetY}px`;
+
+        x = this.element.offsetLeft;
+        y = this.element.offsetTop;
+        let { row: newRow, col: newCol } = this.rootScene.grid.toGridCoordinates(y, x);
+        cells = this.findCells(newRow, newCol);
+        if (!cells) {
+            return;
+        }
+        for (let cell of cells) {
+            if (cell.element) {
+                cell.element.style.backgroundColor = "yellow";
+            }
+        }
     }
     findCells(x: number, y: number): Cell[] | null {
         let cells: Cell[] = [];

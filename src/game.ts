@@ -4,6 +4,7 @@
 /// <reference path="rootScene.ts" />
 /// <reference path="shape.ts" />
 /// <reference path="shapes.ts" />
+/// <reference path="smallShape.ts" />
 
 class Game {
     rootScene: RootScene;
@@ -13,17 +14,26 @@ class Game {
     blockSlotGap: number = 10;
     blockHeight: number = 310;
     constructor(rootElement: HTMLElement) {
+        this.handleSmallShapeClick = this.handleSmallShapeClick.bind(this);
         this.shapeDropped = this.shapeDropped.bind(this);
         this.rootScene = new RootScene(rootElement, this.n);
         this.addShape("#FF0000", 0); // Red block in slot 0
     }
 
-    addShape(color: string, slot: number): Shape {
+    addShape(color: string, slot: number): SmallShape {
         let x = this.blockSlotStart + slot * (this.blockSlotWidth + this.blockSlotGap);
         let shapePosition = new CoordinatePair(x, this.blockHeight);
         let positions = randomShape();
-        let shape = new Shape(this.rootScene, shapePosition, positions, color, this.shapeDropped);
+        let shape = new SmallShape(this.rootScene.element, shapePosition, this.n, 50, positions, this.handleSmallShapeClick);
         return shape;
+    }
+
+    handleSmallShapeClick(smallShape: SmallShape) {
+        let position = smallShape.position;
+        let positions = smallShape.positions;
+        let color = smallShape.color;
+        this.rootScene.element.removeChild(smallShape.element);
+        let shape = new Shape(this.rootScene, position, positions, color, this.shapeDropped);
     }
 
     shapeDropped(shape: Shape) {
@@ -95,11 +105,12 @@ class Game {
         }
     }
 
-    checkForFitCoordinates(shape: Shape): Cell[][] {
+    checkForFitCoordinates(shape: SmallShape): Cell[][] {
         let validPositions: Cell[][] = [];
+        let grid = this.rootScene.grid;
         for (let r = 0; r < this.n; r++) {
             for (let c = 0; c < this.n; c++) {
-                let cells = shape.findCells(r, c);
+                let cells = shape.findCells(grid, r, c);
                 if (cells) {
                     validPositions.push(cells);
                 }

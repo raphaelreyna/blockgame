@@ -13,6 +13,8 @@ class Shape {
         this.onMouseDown = this.onMouseDown.bind(this);
         this.onMouseUp = this.onMouseUp.bind(this);
         this.onMouseMove = this.onMouseMove.bind(this);
+        document.addEventListener("mousemove", this.onMouseMove);
+        document.addEventListener("mousedown", this.onMouseDown);
 
         this.callback = callback;
         this.rootScene = rootScene;
@@ -24,8 +26,8 @@ class Shape {
         this.element.style.top = `${position.y}px`;
         this.element.style.left = `${position.x}px`;
         this.element.classList.add("shapeContainer");
-        this.element.onmousedown = this.onMouseDown;
-        this.element.onmouseup = this.onMouseUp;
+        document.addEventListener("mouseup", this.onMouseUp);
+        document.addEventListener("mousedown", this.onMouseDown);
         this.rootScene.element.appendChild(this.element);
         this.elements = [];
 
@@ -79,8 +81,9 @@ class Shape {
         this.offsetY = event.clientY - rect.top;
         document.addEventListener("mousemove", this.onMouseMove);
     }
-    onMouseUp() {
+    onMouseUp(event?: MouseEvent) {
         document.removeEventListener("mousemove", this.onMouseMove);
+        event?.preventDefault();
         if (!this.element || !this.rootScene.grid) return;
         let x = this.element.offsetLeft;
         let y = this.element.offsetTop;
@@ -96,6 +99,8 @@ class Shape {
                 cell.occupied = true;
             }
         }
+        document.removeEventListener("mousedown", this.onMouseDown);
+        document.removeEventListener("mouseup", this.onMouseUp);
         this.rootScene.element.removeChild(this.element);
         this.callback(this);
     }

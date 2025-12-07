@@ -4,6 +4,7 @@
 /// <reference path="rootScene.ts" />
 /// <reference path="shape.ts" />
 /// <reference path="shapes.ts" />
+/// <reference path="colors.ts" />
 /// <reference path="smallShape.ts" />
 
 class Game {
@@ -17,14 +18,23 @@ class Game {
         this.handleSmallShapeClick = this.handleSmallShapeClick.bind(this);
         this.shapeDropped = this.shapeDropped.bind(this);
         this.rootScene = new RootScene(rootElement, this.n);
-        this.addShape("#FF0000", 0); // Red block in slot 0
+        this.addShape(getRandomUnconstrainedColor(), 0);
     }
 
     addShape(color: string, slot: number): SmallShape {
         let x = this.blockSlotStart + slot * (this.blockSlotWidth + this.blockSlotGap);
         let shapePosition = new CoordinatePair(x, this.blockHeight);
         let positions = randomShape();
-        let shape = new SmallShape(this.rootScene.element, shapePosition, this.n, 50, positions, this.handleSmallShapeClick);
+        let smallShapeConfig: SmallShapeConfig = { 
+            color: color, 
+            positions: positions, 
+            parentElement: this.rootScene.element,
+            position: shapePosition,
+            n: this.n,
+            size: 50,
+            callback: this.handleSmallShapeClick
+        };
+        let shape = new SmallShape(smallShapeConfig);
         return shape;
     }
 
@@ -37,7 +47,7 @@ class Game {
     }
 
     shapeDropped(shape: Shape) {
-        let newShape = this.addShape("#FF0000", 0); // Add another shape after one is dropped
+        let newShape = this.addShape(getRandomUnconstrainedColor(), 0); // Add another shape after one is dropped
         let cellsToClear: Cell[] = [];
         cellsToClear = this.getCompleteRowCells();
         cellsToClear = cellsToClear.concat(this.getCompleteColumnCells());

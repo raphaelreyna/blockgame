@@ -1,6 +1,16 @@
 /// <reference path="util.ts" />
 /// <reference path="grid.ts" />
 
+type SmallShapeConfig = {
+    parentElement: HTMLElement;
+    position: CoordinatePair;
+    n: number;
+    size: number;
+    positions: CoordinatePair[];
+    color: string;
+    callback: (smallShape: SmallShape) => void;
+}
+
 class SmallShape {
     element: HTMLElement;
     n: number;
@@ -10,29 +20,30 @@ class SmallShape {
     position: CoordinatePair;
     color: string = "red";
     callback: (smallShape: SmallShape) => void;
-    constructor(parent: HTMLElement, position: CoordinatePair, n: number, size: number, positions: CoordinatePair[], callback: (smallShape: SmallShape) => void) {
+    constructor(config: SmallShapeConfig) {
         this.handleMouseDown = this.handleMouseDown.bind(this);
 
-        this.n = n;
-        this.size = size;
-        this.callback = callback;
-        this.parentElement = parent;
-        this.positions = positions;
-        this.position = position;
+        this.n = config.n;
+        this.size = config.size;
+        this.callback = config.callback;
+        this.parentElement = config.parentElement;
+        this.positions = config.positions;
+        this.position = config.position;
+        this.color = config.color;
         this.element = document.createElement("div");
         this.element.addEventListener("mousedown", this.handleMouseDown);
         this.element.style.position = "absolute";
-        this.element.style.width = `${size}px`;
+        this.element.style.width = `${this.size}px`;
         this.element.style.height = this.element.style.width;
-        this.element.style.top = `${position.y}px`;
-        this.element.style.left = `${position.x}px`;
+        this.element.style.top = `${this.position.y}px`;
+        this.element.style.left = `${this.position.x}px`;
         this.element.classList.add("shapeContainer");
 
         let minX: number = 1000000;
         let minY: number = 1000000;
         let maxX: number = -1;
         let maxY: number = -1;
-        for (let p of positions) {
+        for (let p of this.positions) {
             if (p.x > maxX) maxX = p.x;
             if (p.y < minY) minY = p.y;
             if (p.x < minX) minX = p.x;
@@ -44,11 +55,11 @@ class SmallShape {
         this.n = maxX - minX + 1;
         let cellSize = this.size / this.n;
 
-        for (let p of positions) {
+        for (let p of this.positions) {
             let element = document.createElement("div");
             element.style.width = `${cellSize}px`;
             element.style.height = `${cellSize}px`;
-            element.style.backgroundColor = "red";
+            element.style.backgroundColor = this.color;
             element.style.position = "absolute";
             let yy = p.y - minY;
             let xx = p.x - minX;
@@ -58,7 +69,7 @@ class SmallShape {
             element.classList.add("shape-section");
             this.element.appendChild(element);
         }
-        parent.appendChild(this.element);
+        this.parentElement.appendChild(this.element);
     }
 
     toWorldCoordinates(row: number, col: number): { x: number; y: number } {

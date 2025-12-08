@@ -15,6 +15,7 @@ class Game {
     blockSlotGap: number = 50;
     blockHeight: number = 310;
     scoreLabel: HTMLSpanElement;
+    shapesInPlay: SmallShape[] = [];
     constructor(rootElement: HTMLElement) {
         this.scoreLabel = document.getElementById("scoreLabel")!;
         this.handleSmallShapeClick = this.handleSmallShapeClick.bind(this);
@@ -25,16 +26,17 @@ class Game {
 
     addShapes() {
         for (let i = 0; i < 3; i++) {
-            this.addShape(getRandomUnconstrainedColor(), i);
+            let smallShape = this.addShape(getRandomUnconstrainedColor(), i);
+            this.shapesInPlay.push(smallShape);
         }
     }
 
     addShape(color: string, slot: number, positions: CoordinatePair[] = randomShape()): SmallShape {
         let x = this.blockSlotStart + slot * (this.blockSlotWidth + this.blockSlotGap);
         let shapePosition = new CoordinatePair(x, this.blockHeight);
-        let smallShapeConfig: SmallShapeConfig = { 
+        let smallShapeConfig: SmallShapeConfig = {
             index: slot,
-            color: color, 
+            color: color,
             figure: new Figure(positions),
             parentElement: this.rootScene.element,
             position: shapePosition,
@@ -51,7 +53,7 @@ class Game {
         let figure = smallShape.figure;
         let color = smallShape.color;
         this.rootScene.element.removeChild(smallShape.element);
-        let shapeConfig: ShapeConfig = { 
+        let shapeConfig: ShapeConfig = {
             index: smallShape.index,
             rootScene: this.rootScene,
             position: position,
@@ -69,7 +71,8 @@ class Game {
             return;
         }
 
-        // Change color of occupied cells to brown
+        this.shapesInPlay = this.shapesInPlay.filter(s => s.index !== shape.index);
+
         for (let cell of cells) {
             cell.setOccupied(true, shape.color);
         }
@@ -77,18 +80,29 @@ class Game {
         this.scoreLabel.textContent = (parseInt(this.scoreLabel.textContent!) + 10).toString();
 
         const grid = this.rootScene.grid;
-        let newShape = this.addShape(getRandomUnconstrainedColor(), shape.index); // Add another shape after one is dropped
         shape.remove();
         let cellsToClear: Cell[] = [];
         cellsToClear = grid.getCompleteRowCells();
         cellsToClear = cellsToClear.concat(grid.getCompleteColumnCells());
         grid.clearCells(cellsToClear);
-        let fitPositions = this.checkForFitCoordinates(newShape);
-        if (fitPositions.length == 0) {
+        if (this.shapesInPlay.length == 0) {
+            this.addShapes();
+        }
+
+        let canPlay = false;
+        for (let shape of this.shapesInPlay) {
+            let fitPositions = this.checkForFitCoordinates(shape);
+            if (fitPositions.length > 0) {
+                canPlay = true;
+                break;
+            }
+        }
+        if (!canPlay) {
             setTimeout(() => {
                 alert("Game Over!");
             }, 1000);
         }
+
     }
 
     checkForFitCoordinates(shape: SmallShape): Cell[][] {

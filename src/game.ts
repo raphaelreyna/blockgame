@@ -14,7 +14,9 @@ class Game {
     blockSlotWidth: number = 50;
     blockSlotGap: number = 50;
     blockHeight: number = 310;
+    scoreLabel: HTMLSpanElement;
     constructor(rootElement: HTMLElement) {
+        this.scoreLabel = document.getElementById("scoreLabel")!;
         this.handleSmallShapeClick = this.handleSmallShapeClick.bind(this);
         this.shapeDropped = this.shapeDropped.bind(this);
         this.rootScene = new RootScene(rootElement, this.n);
@@ -71,6 +73,8 @@ class Game {
         for (let cell of cells) {
             cell.setOccupied(true, shape.color);
         }
+
+        this.scoreLabel.textContent = (parseInt(this.scoreLabel.textContent!) + 10).toString();
 
         const grid = this.rootScene.grid;
         let newShape = this.addShape(getRandomUnconstrainedColor(), shape.index); // Add another shape after one is dropped

@@ -61,15 +61,44 @@ class Game {
         const gridSize = this.rootScene.grid.size;
         const baseCell = Math.min(64, Math.max(34, Math.round(this.rootScene.grid.cellSize * 0.9)));
         const availableWidth = rootElement.clientWidth || gridSize;
-        const sideMargin = 20;
         const gapRatio = 0.5;
-        const widthForSlots = Math.max(200, availableWidth - sideMargin * 2);
+        const preferredMinCellSize = 18;
+        const hardMinCellSize = 12;
+        const computeSideMargin = (width: number) => Math.max(12, Math.round(Math.min(24, width * 0.05)));
+        const sideMargin = computeSideMargin(availableWidth);
+        const maxRowWidth = Math.min(availableWidth, Math.max(120, availableWidth - sideMargin * 2));
+        const widthForSlots = Math.max(maxRowWidth, 120);
         const widthLimitedCell = Math.floor(widthForSlots / (12 + 2 * gapRatio));
-        this.cellSize = Math.max(30, Math.min(baseCell, widthLimitedCell));
+        let initialCellSize = Math.min(baseCell, widthLimitedCell);
+        if (initialCellSize < hardMinCellSize) {
+            initialCellSize = hardMinCellSize;
+        }
+        const getGap = (size: number) => Math.max(6, Math.round(size * gapRatio));
+        const getRowWidth = (size: number) => {
+            const gap = getGap(size);
+            return { rowWidth: size * 12 + gap * 2, gap };
+        };
+
+        this.cellSize = initialCellSize;
+        let slotMetrics = getRowWidth(this.cellSize);
+
+        while (slotMetrics.rowWidth > maxRowWidth && this.cellSize > hardMinCellSize) {
+            this.cellSize -= 1;
+            slotMetrics = getRowWidth(this.cellSize);
+        }
+
+        if (this.cellSize < preferredMinCellSize) {
+            const preferredMetrics = getRowWidth(preferredMinCellSize);
+            if (preferredMetrics.rowWidth <= maxRowWidth) {
+                this.cellSize = preferredMinCellSize;
+                slotMetrics = preferredMetrics;
+            }
+        }
+
         this.blockSlotWidth = this.cellSize * 4;
-        this.blockSlotGap = Math.max(12, Math.round(this.cellSize * gapRatio));
-        const slotRowWidth = this.blockSlotWidth * 3 + this.blockSlotGap * 2;
-        this.blockSlotStart = Math.max(sideMargin, Math.round((availableWidth - slotRowWidth) / 2));
+        this.blockSlotGap = slotMetrics.gap;
+        const slotRowWidth = slotMetrics.rowWidth;
+        this.blockSlotStart = Math.max(8, Math.round((availableWidth - slotRowWidth) / 2));
         this.blockTrayHeight = this.cellSize * 4;
         this.blockHeight = gridSize + Math.round(this.cellSize * 0.5);
         const trayMargin = Math.round(this.cellSize * 0.8);

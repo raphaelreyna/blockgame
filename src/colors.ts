@@ -20,6 +20,7 @@ function getRandomColor(): string {
 }
 
 function getRandomUnconstrainedColor(): string {
-  const randomColor = `#${Math.floor(Math.random() * 16777215).toString(16)}`;
-  return randomColor;
+  const colorNumber = Math.floor(Math.random() * 16777215);
+  const paddedHex = ("000000" + colorNumber.toString(16)).slice(-6);
+  return `#${paddedHex}`;
 }

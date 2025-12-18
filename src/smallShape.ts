@@ -6,10 +6,10 @@ type SmallShapeConfig = {
     parentElement: HTMLElement;
     position: CoordinatePair;
     n: number;
-    size: number;
+    cellSize: number;
     figure: Figure;
     color: string;
-    callback: (smallShape: SmallShape) => void;
+    callback: (smallShape: SmallShape, sourceEvent: PointerEvent) => void;
 }
 
 class SmallShape extends GameNode {
@@ -18,20 +18,24 @@ class SmallShape extends GameNode {
     figure: Figure;
     color: string;
     index: number;
-    callback: (smallShape: SmallShape) => void;
+    cellSize: number;
+    callback: (smallShape: SmallShape, sourceEvent: PointerEvent) => void;
     constructor(config: SmallShapeConfig) {
-        super({ x: config.position.x, y: config.position.y, width: config.size, height: config.size });
-        this.handleMouseDown = this.handleMouseDown.bind(this);
+        const width = config.cellSize * config.figure.width;
+        const height = config.cellSize * config.figure.height;
+        super({ x: config.position.x, y: config.position.y, width: width, height: height });
+        this.handlePointerDown = this.handlePointerDown.bind(this);
         this.index = config.index;
         this.n = config.n;
         this.callback = config.callback;
         this.parentElement = config.parentElement;
         this.figure = config.figure;
         this.color = config.color;
-        this.element.addEventListener("mousedown", this.handleMouseDown);
+        this.cellSize = config.cellSize;
+        this.element.addEventListener("pointerdown", this.handlePointerDown);
         this.element.classList.add("shapeContainer");
         this.n = this.figure.width;
-        let cellSize = this.width / this.n;
+        let cellSize = this.cellSize;
         let offset = new CoordinatePair(-1.0 * this.figure.minX, -1.0 * this.figure.minY);
         let sectionNodes = this.figure.toGameNodes(this.width, this.n, cellSize, offset);
         sectionNodes.forEach((node) => {
@@ -41,7 +45,8 @@ class SmallShape extends GameNode {
         });
         this.addToParent(this.parentElement);
     }
-    handleMouseDown(event: MouseEvent) {
-        this.callback(this);
+    handlePointerDown(event: PointerEvent) {
+        event.preventDefault();
+        this.callback(this, event);
     }
 }

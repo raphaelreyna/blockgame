@@ -10,10 +10,12 @@
 class Game {
     rootScene: RootScene;
     n: number = 10;
-    blockSlotStart: number = 10;
-    blockSlotWidth: number = 50;
-    blockSlotGap: number = 50;
-    blockHeight: number = 310;
+    blockSlotStart: number = 0;
+    blockSlotWidth: number = 0; // slot area width
+    blockSlotGap: number = 0;
+    blockHeight: number = 0;
+    blockTrayHeight: number = 0;
+    cellSize: number = 0;
     scoreLabel: HTMLSpanElement;
     shapesInPlay: SmallShape[] = [];
     constructor(rootElement: HTMLElement) {
@@ -21,6 +23,7 @@ class Game {
         this.handleSmallShapeClick = this.handleSmallShapeClick.bind(this);
         this.shapeDropped = this.shapeDropped.bind(this);
         this.rootScene = new RootScene(rootElement, this.n);
+        this.configureLayout(rootElement);
         this.addShapes();
     }
 
@@ -32,23 +35,48 @@ class Game {
     }
 
     addShape(color: string, slot: number, positions: CoordinatePair[] = randomShape()): SmallShape {
-        let x = this.blockSlotStart + slot * (this.blockSlotWidth + this.blockSlotGap);
-        let shapePosition = new CoordinatePair(x, this.blockHeight);
+        const figure = new Figure(positions);
+        const slotX = this.blockSlotStart + slot * (this.blockSlotWidth + this.blockSlotGap);
+        const shapeWidth = this.cellSize * figure.width;
+        const shapeHeight = this.cellSize * figure.height;
+        const centeredX = slotX + (this.blockSlotWidth - shapeWidth) / 2;
+        const centeredY = this.blockHeight + (this.blockTrayHeight - shapeHeight) / 2;
+        let shapePosition = new CoordinatePair(centeredX, centeredY);
         let smallShapeConfig: SmallShapeConfig = {
             index: slot,
             color: color,
-            figure: new Figure(positions),
+            figure: figure,
             parentElement: this.rootScene.element,
             position: shapePosition,
             n: this.n,
-            size: 50,
+            cellSize: this.cellSize,
             callback: this.handleSmallShapeClick
         };
         let shape = new SmallShape(smallShapeConfig);
         return shape;
     }
 
-    handleSmallShapeClick(smallShape: SmallShape) {
+    configureLayout(rootElement: HTMLElement) {
+        const gridSize = this.rootScene.grid.size;
+        const baseCell = Math.min(64, Math.max(34, Math.round(this.rootScene.grid.cellSize * 0.9)));
+        const availableWidth = rootElement.clientWidth || gridSize;
+        const sideMargin = 20;
+        const gapRatio = 0.5;
+        const widthForSlots = Math.max(200, availableWidth - sideMargin * 2);
+        const widthLimitedCell = Math.floor(widthForSlots / (12 + 2 * gapRatio));
+        this.cellSize = Math.max(30, Math.min(baseCell, widthLimitedCell));
+        this.blockSlotWidth = this.cellSize * 4;
+        this.blockSlotGap = Math.max(12, Math.round(this.cellSize * gapRatio));
+        const slotRowWidth = this.blockSlotWidth * 3 + this.blockSlotGap * 2;
+        this.blockSlotStart = Math.max(sideMargin, Math.round((availableWidth - slotRowWidth) / 2));
+        this.blockTrayHeight = this.cellSize * 4;
+        this.blockHeight = gridSize + Math.round(this.cellSize * 0.5);
+        const trayMargin = Math.round(this.cellSize * 0.8);
+        const containerHeight = this.blockHeight + this.blockTrayHeight + trayMargin;
+        rootElement.style.height = `${containerHeight}px`;
+    }
+
+    handleSmallShapeClick(smallShape: SmallShape, sourceEvent: PointerEvent) {
         let position = smallShape.position;
         let figure = smallShape.figure;
         let color = smallShape.color;
@@ -62,6 +90,7 @@ class Game {
             dropCallback: this.shapeDropped
         };
         let shape = new Shape(shapeConfig);
+        shape.beginDragFromPointer(sourceEvent);
     }
 
     shapeDropped(shape: Shape, cells: Cell[]) {

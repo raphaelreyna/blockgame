@@ -86,6 +86,8 @@ class GameNode {
         this.element.style.top = rect.y + "px";
         this.element.style.width = rect.width + "px";
         this.element.style.height = rect.height + "px";
+        this.element.style.touchAction = "none";
+        this.element.style.userSelect = "none";
     }
 
     appendChild(child: HTMLElement) {

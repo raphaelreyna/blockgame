@@ -6,6 +6,7 @@
 /// <reference path="shapes.ts" />
 /// <reference path="colors.ts" />
 /// <reference path="smallShape.ts" />
+/// <reference path="effects.ts" />
 
 class Game {
     rootScene: RootScene;
@@ -74,6 +75,7 @@ class Game {
         const trayMargin = Math.round(this.cellSize * 0.8);
         const containerHeight = this.blockHeight + this.blockTrayHeight + trayMargin;
         rootElement.style.height = `${containerHeight}px`;
+        this.rootScene.effectsLayer.refreshSize();
     }
 
     handleSmallShapeClick(smallShape: SmallShape, sourceEvent: PointerEvent) {
@@ -113,6 +115,9 @@ class Game {
         let cellsToClear: Cell[] = [];
         cellsToClear = grid.getCompleteRowCells();
         cellsToClear = cellsToClear.concat(grid.getCompleteColumnCells());
+        if (cellsToClear.length > 0) {
+            this.rootScene.effectsLayer.emitSparkles(cellsToClear);
+        }
         grid.clearCells(cellsToClear);
         if (this.shapesInPlay.length == 0) {
             this.addShapes();

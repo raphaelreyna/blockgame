@@ -721,7 +721,15 @@ const SHAPE_DEFINITIONS = [
             new CoordinatePair(2, 1),
             new CoordinatePair(1, 0)
         ]
-    }
+    },
+    {
+        coordinates: [
+            new CoordinatePair(0, 0),
+            new CoordinatePair(1, 0),
+            new CoordinatePair(1, 1),
+            new CoordinatePair(2, 1)
+        ]
+    },
 ];
 const SHAPES = buildShapeRoster(SHAPE_DEFINITIONS);
 function buildShapeRoster(definitions) {

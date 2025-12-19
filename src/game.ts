@@ -34,7 +34,7 @@ class Game {
         this.shapeDropped = this.shapeDropped.bind(this);
         this.rootScene = new RootScene(rootElement, this.n);
         this.configureLayout(rootElement);
-        this.resetGame();
+        this.startNewGame();
     }
 
     addShapes() {
@@ -173,7 +173,7 @@ class Game {
         if (!canPlay) {
             setTimeout(() => {
                 alert("Game Over!");
-                this.resetGame();
+                this.startNewGame();
             }, 1000);
         }
 
@@ -193,7 +193,7 @@ class Game {
         return validPositions;
     }
 
-    private resetGame(): void {
+    startNewGame(): void {
         for (const shape of this.shapesInPlay) {
             shape.destroy();
         }

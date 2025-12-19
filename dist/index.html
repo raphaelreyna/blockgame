@@ -141,6 +141,15 @@
                 width: 100%;
                 height: 1px;
             }
+
+            .settings-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .settings-actions button {
+                width: 100%;
+            }
         }
 
         h6 {
@@ -296,6 +305,39 @@
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
+        }
+
+        .settings-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 1.2rem;
+            border-radius: 18px;
+            border: 1px solid var(--soft-border);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .settings-actions__text {
+            text-align: left;
+        }
+
+        .settings-actions__title {
+            margin: 0;
+            font-size: 0.85rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        .settings-actions__hint {
+            margin: 0.3rem 0 0;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .settings-actions button {
+            white-space: nowrap;
         }
 
         .ghost-button--compact {
@@ -486,6 +528,13 @@
                 <h6>Backgrounds &amp; Settings</h6>
                 <button type="button" id="close-settings" class="ghost-button ghost-button--compact" aria-label="Close settings">Close</button>
             </div>
+            <section class="settings-actions">
+                <div class="settings-actions__text">
+                    <p class="settings-actions__title">New Game</p>
+                    <p class="settings-actions__hint">Reset the board instantly without touching your high score.</p>
+                </div>
+                <button type="button" id="new-game-button" class="ghost-button">Start Over</button>
+            </section>
             <section id="shader-panel" class="shader-panel">
                 <div class="shader-panel__header">
                     <h6>Custom Backgrounds</h6>

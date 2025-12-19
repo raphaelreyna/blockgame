@@ -23,6 +23,7 @@ const settingsDrawer = document.getElementById("settings-drawer");
 const settingsOverlay = document.getElementById("settings-overlay");
 const openSettingsButton = document.getElementById("open-settings");
 const closeSettingsButton = document.getElementById("close-settings");
+const newGameButton = document.getElementById("new-game-button");
 let lastFocusedElement: HTMLElement | null = null;
 let isScrollLocked = false;
 let lockedScrollY = 0;
@@ -94,6 +95,15 @@ const setSettingsDrawerState = (shouldOpen: boolean) => {
     lastFocusedElement?.focus();
     scheduleLayoutRefresh(320);
 };
+
+newGameButton?.addEventListener("click", () => {
+    const confirmReset = window.confirm("Start a new game? Your current score will be lost.");
+    if (!confirmReset) {
+        return;
+    }
+    game.startNewGame();
+    setSettingsDrawerState(false);
+});
 
 openSettingsButton?.addEventListener("click", () => setSettingsDrawerState(true));
 closeSettingsButton?.addEventListener("click", () => setSettingsDrawerState(false));

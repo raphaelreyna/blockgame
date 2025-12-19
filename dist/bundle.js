@@ -892,7 +892,7 @@ class Game {
         this.shapeDropped = this.shapeDropped.bind(this);
         this.rootScene = new RootScene(rootElement, this.n);
         this.configureLayout(rootElement);
-        this.resetGame();
+        this.startNewGame();
     }
     addShapes() {
         for (let i = 0; i < 3; i++) {
@@ -1017,7 +1017,7 @@ class Game {
         if (!canPlay) {
             setTimeout(() => {
                 alert("Game Over!");
-                this.resetGame();
+                this.startNewGame();
             }, 1000);
         }
     }
@@ -1034,7 +1034,7 @@ class Game {
         }
         return validPositions;
     }
-    resetGame() {
+    startNewGame() {
         for (const shape of this.shapesInPlay) {
             shape.destroy();
         }
@@ -1730,6 +1730,7 @@ const settingsDrawer = document.getElementById("settings-drawer");
 const settingsOverlay = document.getElementById("settings-overlay");
 const openSettingsButton = document.getElementById("open-settings");
 const closeSettingsButton = document.getElementById("close-settings");
+const newGameButton = document.getElementById("new-game-button");
 let lastFocusedElement = null;
 let isScrollLocked = false;
 let lockedScrollY = 0;
@@ -1796,6 +1797,14 @@ const setSettingsDrawerState = (shouldOpen) => {
     lastFocusedElement === null || lastFocusedElement === void 0 ? void 0 : lastFocusedElement.focus();
     scheduleLayoutRefresh(320);
 };
+newGameButton === null || newGameButton === void 0 ? void 0 : newGameButton.addEventListener("click", () => {
+    const confirmReset = window.confirm("Start a new game? Your current score will be lost.");
+    if (!confirmReset) {
+        return;
+    }
+    game.startNewGame();
+    setSettingsDrawerState(false);
+});
 openSettingsButton === null || openSettingsButton === void 0 ? void 0 : openSettingsButton.addEventListener("click", () => setSettingsDrawerState(true));
 closeSettingsButton === null || closeSettingsButton === void 0 ? void 0 : closeSettingsButton.addEventListener("click", () => setSettingsDrawerState(false));
 settingsOverlay === null || settingsOverlay === void 0 ? void 0 : settingsOverlay.addEventListener("click", () => setSettingsDrawerState(false));

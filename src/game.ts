@@ -20,15 +20,25 @@ class Game {
     cellSize: number = 0;
     scoreLabel: HTMLSpanElement;
     highScoreLabel: HTMLSpanElement;
+    overallHighScoreLabel: HTMLSpanElement;
+    blockSetLabel: HTMLSpanElement;
     highScoreStore: HighScoreStore;
     score: number = 0;
     highScore: number = 0;
+    overallHighScore: number = 0;
+    blockSetId: string;
+    blockSetName: string;
     shapesInPlay: SmallShape[] = [];
-    constructor(rootElement: HTMLElement) {
+    constructor(rootElement: HTMLElement, initialBlockSetId: string = getDefaultBlockSetId()) {
         this.scoreLabel = document.getElementById("scoreLabel")!;
         this.highScoreLabel = document.getElementById("highScoreLabel")!;
+        this.overallHighScoreLabel = document.getElementById("overallHighScoreLabel")!;
+        this.blockSetLabel = document.getElementById("blockSetLabel")!;
+        this.blockSetId = initialBlockSetId;
+        this.blockSetName = getBlockSet(this.blockSetId).name;
         this.highScoreStore = new HighScoreStore();
-        this.highScore = this.highScoreStore.get();
+        const snapshot = this.highScoreStore.getSnapshot();
+        this.applyHighScoreSnapshot(snapshot);
         this.updateScoreLabels();
         this.handleSmallShapeClick = this.handleSmallShapeClick.bind(this);
         this.shapeDropped = this.shapeDropped.bind(this);
@@ -44,7 +54,7 @@ class Game {
         }
     }
 
-    addShape(color: string, slot: number, positions: CoordinatePair[] = randomShape()): SmallShape {
+    addShape(color: string, slot: number, positions: CoordinatePair[] = getRandomShapeForBlockSet(this.blockSetId)): SmallShape {
         const figure = new Figure(positions);
         const slotX = this.blockSlotStart + slot * (this.blockSlotWidth + this.blockSlotGap);
         const shapeWidth = this.cellSize * figure.width;
@@ -202,6 +212,19 @@ class Game {
         this.score = 0;
         this.updateScoreLabels();
         this.addShapes();
+        this.notifyScoreChange();
+    }
+
+    setBlockSet(blockSetId: string): void {
+        if (!blockSetId || blockSetId === this.blockSetId) {
+            return;
+        }
+        this.blockSetId = blockSetId;
+        this.blockSetName = getBlockSet(this.blockSetId).name;
+        const snapshot = this.highScoreStore.getSnapshot();
+        this.applyHighScoreSnapshot(snapshot);
+        this.updateScoreLabels();
+        this.startNewGame();
     }
 
     private incrementScore(amount: number): void {
@@ -209,14 +232,39 @@ class Game {
             return;
         }
         this.score += amount;
-        if (this.score > this.highScore) {
-            this.highScore = this.highScoreStore.set(this.score);
-        }
+        const snapshot = this.highScoreStore.updateIfGreater(this.blockSetId, this.score);
+        this.applyHighScoreSnapshot(snapshot);
         this.updateScoreLabels();
+        this.notifyScoreChange(snapshot);
     }
 
     private updateScoreLabels(): void {
         this.scoreLabel.textContent = this.score.toString();
         this.highScoreLabel.textContent = this.highScore.toString();
+        this.overallHighScoreLabel.textContent = this.overallHighScore.toString();
+        this.blockSetLabel.textContent = this.blockSetName;
+    }
+
+    private applyHighScoreSnapshot(snapshot: HighScoreSnapshot): void {
+        this.highScore = snapshot.perSet[this.blockSetId] ?? 0;
+        this.overallHighScore = snapshot.overall;
+    }
+
+    private notifyScoreChange(snapshot?: HighScoreSnapshot): void {
+        const detailSnapshot = snapshot ?? this.highScoreStore.getSnapshot();
+        document.dispatchEvent(new CustomEvent("blockgame:scores", {
+            detail: {
+                blockSetId: this.blockSetId,
+                blockSetName: this.blockSetName,
+                score: this.score,
+                highScore: this.highScore,
+                overallHighScore: this.overallHighScore,
+                snapshot: detailSnapshot
+            }
+        }));
+    }
+
+    getActiveBlockSetId(): string {
+        return this.blockSetId;
     }
 }

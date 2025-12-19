@@ -14,7 +14,24 @@ type RotationOptions = {
     angles?: ReadonlyArray<number>;
 };
 
-const SHAPE_DEFINITIONS: ShapeDefinition[] = [
+type BlockSetDefinition = {
+    id: string;
+    name: string;
+    description: string;
+    shapes: ShapeDefinition[];
+};
+
+type BlockSetSummary = {
+    id: string;
+    name: string;
+    description: string;
+    shapes: CoordinatePair[][];
+    previewShapes: CoordinatePair[][];
+};
+
+const DEFAULT_BLOCK_SET_ID = "classic";
+
+const CLASSIC_SHAPE_DEFINITIONS: ShapeDefinition[] = [
     {
         coordinates: [new CoordinatePair(0, 0)]
     },
@@ -45,7 +62,8 @@ const SHAPE_DEFINITIONS: ShapeDefinition[] = [
             new CoordinatePair(0, 1),
             new CoordinatePair(1, 0),
             new CoordinatePair(1, 1)
-        ]
+        ],
+        rotationOptions: { angles: [0] }
     },
     {
         coordinates: [
@@ -85,10 +103,47 @@ const SHAPE_DEFINITIONS: ShapeDefinition[] = [
             new CoordinatePair(1, 1),
             new CoordinatePair(2, 1)
         ]
-    },
+    }
 ];
 
-const SHAPES: CoordinatePair[][] = buildShapeRoster(SHAPE_DEFINITIONS);
+const BLOCK_SET_DEFINITIONS: BlockSetDefinition[] = [
+    {
+        id: "classic",
+        name: "Classic",
+        description: "Balanced starter pieces that keep the board approachable.",
+        shapes: CLASSIC_SHAPE_DEFINITIONS
+    },
+    {
+        id: "expanded",
+        name: "Expanded",
+        description: "Adds a chunky 3x3 block for big clears (and bigger jams).",
+        shapes: [
+            ...CLASSIC_SHAPE_DEFINITIONS,
+            {
+                coordinates: [
+                    new CoordinatePair(0, 0),
+                    new CoordinatePair(1, 0),
+                    new CoordinatePair(2, 0),
+                    new CoordinatePair(0, 1),
+                    new CoordinatePair(1, 1),
+                    new CoordinatePair(2, 1),
+                    new CoordinatePair(0, 2),
+                    new CoordinatePair(1, 2),
+                    new CoordinatePair(2, 2)
+                ],
+                rotationOptions: { angles: [0] }
+            }
+        ]
+    }
+];
+
+const BLOCK_SETS = BLOCK_SET_DEFINITIONS.map(definition => ({
+    id: definition.id,
+    name: definition.name,
+    description: definition.description,
+    shapes: buildShapeRoster(definition.shapes),
+    previewShapes: buildPreviewShapes(definition.shapes)
+}));
 
 function buildShapeRoster(definitions: ShapeDefinition[]): CoordinatePair[][] {
     const roster: CoordinatePair[][] = [];
@@ -97,6 +152,10 @@ function buildShapeRoster(definitions: ShapeDefinition[]): CoordinatePair[][] {
         roster.push(...variants.map(cloneShape));
     }
     return roster;
+}
+
+function buildPreviewShapes(definitions: ShapeDefinition[]): CoordinatePair[][] {
+    return definitions.map(definition => cloneShape(definition.coordinates));
 }
 
 function generateRotations(points: CoordinatePair[], options?: RotationOptions): CoordinatePair[][] {
@@ -157,7 +216,51 @@ function cloneShape(points: CoordinatePair[]): CoordinatePair[] {
     return points.map(point => new CoordinatePair(point.x, point.y));
 }
 
+function getBlockSets(): BlockSetSummary[] {
+    return BLOCK_SETS.map(set => ({
+        id: set.id,
+        name: set.name,
+        description: set.description,
+        shapes: set.shapes.map(cloneShape),
+        previewShapes: set.previewShapes.map(cloneShape)
+    }));
+}
+
+function getDefaultBlockSetId(): string {
+    return DEFAULT_BLOCK_SET_ID;
+}
+
+function getBlockSetRoster(blockSetId: string): CoordinatePair[][] {
+    const blockSet = resolveBlockSet(blockSetId);
+    return blockSet.shapes.map(cloneShape);
+}
+
+function getBlockSet(blockSetId: string): BlockSetSummary {
+    const blockSet = resolveBlockSet(blockSetId);
+    return {
+        id: blockSet.id,
+        name: blockSet.name,
+        description: blockSet.description,
+        shapes: blockSet.shapes.map(cloneShape),
+        previewShapes: blockSet.previewShapes.map(cloneShape)
+    };
+}
+
+function getRandomShapeForBlockSet(blockSetId: string): CoordinatePair[] {
+    const blockSet = resolveBlockSet(blockSetId);
+    const randomIndex = Math.floor(Math.random() * blockSet.shapes.length);
+    return cloneShape(blockSet.shapes[randomIndex]);
+}
+
 function randomShape(): CoordinatePair[] {
-    const randomIndex = Math.floor(Math.random() * SHAPES.length);
-    return cloneShape(SHAPES[randomIndex]);
+    return getRandomShapeForBlockSet(DEFAULT_BLOCK_SET_ID);
+}
+
+function resolveBlockSet(blockSetId: string) {
+    const fallback = BLOCK_SETS.find(set => set.id === DEFAULT_BLOCK_SET_ID)!;
+    if (!blockSetId) {
+        return fallback;
+    }
+    const match = BLOCK_SETS.find(set => set.id === blockSetId);
+    return match ?? fallback;
 }

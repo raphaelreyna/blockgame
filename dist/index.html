@@ -125,6 +125,18 @@
             color: #ffffff;
         }
 
+        .score-shell__meta {
+            margin: 0;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .score-shell__meta span {
+            color: #ffffff;
+        }
+
         @media (max-width: 520px) {
             .score-shell {
                 flex-direction: column;
@@ -149,6 +161,10 @@
 
             .settings-actions button {
                 width: 100%;
+            }
+
+            .blockset-card {
+                padding: 0.85rem;
             }
         }
 
@@ -305,6 +321,106 @@
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
+        }
+
+        .blockset-panel {
+            width: 100%;
+            padding: clamp(1rem, 3vw, 1.5rem);
+            border-radius: 22px;
+            border: 1px solid var(--soft-border);
+            background: rgba(255, 255, 255, 0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .blockset-panel__header {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .blockset-panel__hint {
+            margin: 0;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .blockset-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .blockset-card {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 18px;
+            background: rgba(6, 9, 22, 0.6);
+            padding: 0.85rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.18s ease, border 0.18s ease, background 0.18s ease;
+            text-align: left;
+        }
+
+        .blockset-card:hover {
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .blockset-card--active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px rgba(255, 183, 3, 0.45);
+            background: rgba(255, 183, 3, 0.08);
+        }
+
+        .blockset-card__meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
+        .blockset-card__name {
+            font-size: 0.95rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .blockset-card__score {
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .blockset-card__hint {
+            margin: 0;
+            font-size: 0.82rem;
+            color: var(--muted);
+        }
+
+        .blockset-card__preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            align-items: flex-start;
+        }
+
+        .blockset-preview-shape {
+            position: relative;
+            display: inline-block;
+            padding: 0;
+            border-radius: 4px;
+            background: transparent;
+            overflow: visible;
+        }
+
+        .blockset-preview-cell {
+            border-radius: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.55);
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
         }
 
         .settings-actions {
@@ -511,11 +627,13 @@
             <div class="score-shell__section">
                 <p class="score-shell__label">Score</p>
                 <span id="scoreLabel" class="score-shell__value">0</span>
+                <p class="score-shell__meta">Block Set · <span id="blockSetLabel">Classic</span></p>
             </div>
             <div class="score-shell__divider" aria-hidden="true"></div>
             <div class="score-shell__section score-shell__section--right">
                 <p class="score-shell__label">High Score</p>
                 <span id="highScoreLabel" class="score-shell__value">0</span>
+                <p class="score-shell__meta">Overall · <span id="overallHighScoreLabel">0</span></p>
             </div>
         </header>
         <div id="game-container"></div>
@@ -534,6 +652,13 @@
                     <p class="settings-actions__hint">Reset the board instantly without touching your high score.</p>
                 </div>
                 <button type="button" id="new-game-button" class="ghost-button">Start Over</button>
+            </section>
+            <section class="blockset-panel" aria-labelledby="blockset-panel-heading">
+                <div class="blockset-panel__header">
+                    <h6 id="blockset-panel-heading">Block Sets</h6>
+                    <p class="blockset-panel__hint">Swap between curated shape collections. Scores persist per set.</p>
+                </div>
+                <div id="blockset-list" class="blockset-list" role="list"></div>
             </section>
             <section id="shader-panel" class="shader-panel">
                 <div class="shader-panel__header">

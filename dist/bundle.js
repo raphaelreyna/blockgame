@@ -658,7 +658,8 @@ class Shape extends GameNode {
     }
 }
 /// <reference path="util.ts" />
-const SHAPE_DEFINITIONS = [
+const DEFAULT_BLOCK_SET_ID = "classic";
+const CLASSIC_SHAPE_DEFINITIONS = [
     {
         coordinates: [new CoordinatePair(0, 0)]
     },
@@ -689,7 +690,8 @@ const SHAPE_DEFINITIONS = [
             new CoordinatePair(0, 1),
             new CoordinatePair(1, 0),
             new CoordinatePair(1, 1)
-        ]
+        ],
+        rotationOptions: { angles: [0] }
     },
     {
         coordinates: [
@@ -729,9 +731,45 @@ const SHAPE_DEFINITIONS = [
             new CoordinatePair(1, 1),
             new CoordinatePair(2, 1)
         ]
-    },
+    }
 ];
-const SHAPES = buildShapeRoster(SHAPE_DEFINITIONS);
+const BLOCK_SET_DEFINITIONS = [
+    {
+        id: "classic",
+        name: "Classic",
+        description: "Balanced starter pieces that keep the board approachable.",
+        shapes: CLASSIC_SHAPE_DEFINITIONS
+    },
+    {
+        id: "expanded",
+        name: "Expanded",
+        description: "Adds a chunky 3x3 block for big clears (and bigger jams).",
+        shapes: [
+            ...CLASSIC_SHAPE_DEFINITIONS,
+            {
+                coordinates: [
+                    new CoordinatePair(0, 0),
+                    new CoordinatePair(1, 0),
+                    new CoordinatePair(2, 0),
+                    new CoordinatePair(0, 1),
+                    new CoordinatePair(1, 1),
+                    new CoordinatePair(2, 1),
+                    new CoordinatePair(0, 2),
+                    new CoordinatePair(1, 2),
+                    new CoordinatePair(2, 2)
+                ],
+                rotationOptions: { angles: [0] }
+            }
+        ]
+    }
+];
+const BLOCK_SETS = BLOCK_SET_DEFINITIONS.map(definition => ({
+    id: definition.id,
+    name: definition.name,
+    description: definition.description,
+    shapes: buildShapeRoster(definition.shapes),
+    previewShapes: buildPreviewShapes(definition.shapes)
+}));
 function buildShapeRoster(definitions) {
     const roster = [];
     for (const definition of definitions) {
@@ -739,6 +777,9 @@ function buildShapeRoster(definitions) {
         roster.push(...variants.map(cloneShape));
     }
     return roster;
+}
+function buildPreviewShapes(definitions) {
+    return definitions.map(definition => cloneShape(definition.coordinates));
 }
 function generateRotations(points, options) {
     const normalizedAngles = normalizeAngles(options === null || options === void 0 ? void 0 : options.angles);
@@ -792,9 +833,47 @@ function canonicalKey(points) {
 function cloneShape(points) {
     return points.map(point => new CoordinatePair(point.x, point.y));
 }
+function getBlockSets() {
+    return BLOCK_SETS.map(set => ({
+        id: set.id,
+        name: set.name,
+        description: set.description,
+        shapes: set.shapes.map(cloneShape),
+        previewShapes: set.previewShapes.map(cloneShape)
+    }));
+}
+function getDefaultBlockSetId() {
+    return DEFAULT_BLOCK_SET_ID;
+}
+function getBlockSetRoster(blockSetId) {
+    const blockSet = resolveBlockSet(blockSetId);
+    return blockSet.shapes.map(cloneShape);
+}
+function getBlockSet(blockSetId) {
+    const blockSet = resolveBlockSet(blockSetId);
+    return {
+        id: blockSet.id,
+        name: blockSet.name,
+        description: blockSet.description,
+        shapes: blockSet.shapes.map(cloneShape),
+        previewShapes: blockSet.previewShapes.map(cloneShape)
+    };
+}
+function getRandomShapeForBlockSet(blockSetId) {
+    const blockSet = resolveBlockSet(blockSetId);
+    const randomIndex = Math.floor(Math.random() * blockSet.shapes.length);
+    return cloneShape(blockSet.shapes[randomIndex]);
+}
 function randomShape() {
-    const randomIndex = Math.floor(Math.random() * SHAPES.length);
-    return cloneShape(SHAPES[randomIndex]);
+    return getRandomShapeForBlockSet(DEFAULT_BLOCK_SET_ID);
+}
+function resolveBlockSet(blockSetId) {
+    const fallback = BLOCK_SETS.find(set => set.id === DEFAULT_BLOCK_SET_ID);
+    if (!blockSetId) {
+        return fallback;
+    }
+    const match = BLOCK_SETS.find(set => set.id === blockSetId);
+    return match !== null && match !== void 0 ? match : fallback;
 }
 /// <reference path="util.ts" />
 /// <reference path="grid.ts" />
@@ -833,33 +912,85 @@ class SmallShape extends GameNode {
         this.remove();
     }
 }
+/// <reference path="shapes.ts" />
 class HighScoreStore {
-    get() {
-        const raw = localStorage.getItem(HighScoreStore.STORAGE_KEY);
-        if (!raw) {
-            return 0;
-        }
-        const parsed = Number.parseInt(raw, 10);
-        if (!Number.isFinite(parsed) || parsed < 0) {
-            return 0;
-        }
-        return parsed;
+    getForSet(blockSetId) {
+        var _a;
+        const snapshot = this.getSnapshot();
+        return (_a = snapshot.perSet[blockSetId]) !== null && _a !== void 0 ? _a : 0;
     }
-    set(score) {
-        const normalized = Math.max(0, Math.floor(score));
-        localStorage.setItem(HighScoreStore.STORAGE_KEY, normalized.toString());
-        return normalized;
+    getOverall() {
+        return this.getSnapshot().overall;
     }
-    updateIfGreater(score) {
+    getSnapshot() {
+        return this.cloneSnapshot(this.readSnapshot());
+    }
+    updateIfGreater(blockSetId, score) {
+        var _a;
         const normalized = Math.max(0, Math.floor(score));
-        const current = this.get();
+        const snapshot = this.readSnapshot();
+        const current = (_a = snapshot.perSet[blockSetId]) !== null && _a !== void 0 ? _a : 0;
         if (normalized > current) {
-            return this.set(normalized);
+            snapshot.perSet[blockSetId] = normalized;
+            snapshot.overall = Math.max(snapshot.overall, normalized);
+            this.writeSnapshot(snapshot);
         }
-        return current;
+        return this.cloneSnapshot(snapshot);
+    }
+    readSnapshot() {
+        const raw = localStorage.getItem(HighScoreStore.STORAGE_KEY);
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                return this.normalizeSnapshot(parsed);
+            }
+            catch (_error) {
+                // fall through to legacy / default
+            }
+        }
+        const legacy = localStorage.getItem(HighScoreStore.LEGACY_KEY);
+        if (legacy) {
+            const parsedLegacy = Number.parseInt(legacy, 10);
+            if (Number.isFinite(parsedLegacy) && parsedLegacy > 0) {
+                const migrated = {
+                    overall: parsedLegacy,
+                    perSet: { [getDefaultBlockSetId()]: parsedLegacy }
+                };
+                this.writeSnapshot(migrated);
+                localStorage.removeItem(HighScoreStore.LEGACY_KEY);
+                return migrated;
+            }
+        }
+        return { overall: 0, perSet: {} };
+    }
+    writeSnapshot(snapshot) {
+        localStorage.setItem(HighScoreStore.STORAGE_KEY, JSON.stringify(snapshot));
+    }
+    normalizeSnapshot(snapshot) {
+        const overall = Number.isFinite(snapshot === null || snapshot === void 0 ? void 0 : snapshot.overall) && snapshot.overall > 0 ? Math.floor(snapshot.overall) : 0;
+        const perSet = {};
+        if ((snapshot === null || snapshot === void 0 ? void 0 : snapshot.perSet) && typeof snapshot.perSet === "object") {
+            for (const [key, value] of Object.entries(snapshot.perSet)) {
+                if (!key)
+                    continue;
+                const parsedValue = Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+                if (parsedValue > 0) {
+                    perSet[key] = parsedValue;
+                }
+            }
+        }
+        const normalizedOverall = Math.max(overall, ...Object.values(perSet), 0);
+        return { overall: normalizedOverall, perSet };
+    }
+    cloneSnapshot(snapshot) {
+        return {
+            overall: snapshot.overall,
+            perSet: Object.assign({}, snapshot.perSet)
+        };
     }
 }
-HighScoreStore.STORAGE_KEY = "blockgame.highScore";
+HighScoreStore.STORAGE_KEY = "blockgame.highScores";
+HighScoreStore.LEGACY_KEY = "blockgame.highScore";
 /// <reference path="util.ts" />
 /// <reference path="cell.ts" />
 /// <reference path="grid.ts" />
@@ -871,7 +1002,7 @@ HighScoreStore.STORAGE_KEY = "blockgame.highScore";
 /// <reference path="effects.ts" />
 /// <reference path="highScore.ts" />
 class Game {
-    constructor(rootElement) {
+    constructor(rootElement, initialBlockSetId = getDefaultBlockSetId()) {
         this.n = 10;
         this.blockSlotStart = 0;
         this.blockSlotWidth = 0; // slot area width
@@ -881,11 +1012,17 @@ class Game {
         this.cellSize = 0;
         this.score = 0;
         this.highScore = 0;
+        this.overallHighScore = 0;
         this.shapesInPlay = [];
         this.scoreLabel = document.getElementById("scoreLabel");
         this.highScoreLabel = document.getElementById("highScoreLabel");
+        this.overallHighScoreLabel = document.getElementById("overallHighScoreLabel");
+        this.blockSetLabel = document.getElementById("blockSetLabel");
+        this.blockSetId = initialBlockSetId;
+        this.blockSetName = getBlockSet(this.blockSetId).name;
         this.highScoreStore = new HighScoreStore();
-        this.highScore = this.highScoreStore.get();
+        const snapshot = this.highScoreStore.getSnapshot();
+        this.applyHighScoreSnapshot(snapshot);
         this.updateScoreLabels();
         this.handleSmallShapeClick = this.handleSmallShapeClick.bind(this);
         this.shapeDropped = this.shapeDropped.bind(this);
@@ -899,7 +1036,7 @@ class Game {
             this.shapesInPlay.push(smallShape);
         }
     }
-    addShape(color, slot, positions = randomShape()) {
+    addShape(color, slot, positions = getRandomShapeForBlockSet(this.blockSetId)) {
         const figure = new Figure(positions);
         const slotX = this.blockSlotStart + slot * (this.blockSlotWidth + this.blockSlotGap);
         const shapeWidth = this.cellSize * figure.width;
@@ -1042,20 +1179,55 @@ class Game {
         this.score = 0;
         this.updateScoreLabels();
         this.addShapes();
+        this.notifyScoreChange();
+    }
+    setBlockSet(blockSetId) {
+        if (!blockSetId || blockSetId === this.blockSetId) {
+            return;
+        }
+        this.blockSetId = blockSetId;
+        this.blockSetName = getBlockSet(this.blockSetId).name;
+        const snapshot = this.highScoreStore.getSnapshot();
+        this.applyHighScoreSnapshot(snapshot);
+        this.updateScoreLabels();
+        this.startNewGame();
     }
     incrementScore(amount) {
         if (amount <= 0) {
             return;
         }
         this.score += amount;
-        if (this.score > this.highScore) {
-            this.highScore = this.highScoreStore.set(this.score);
-        }
+        const snapshot = this.highScoreStore.updateIfGreater(this.blockSetId, this.score);
+        this.applyHighScoreSnapshot(snapshot);
         this.updateScoreLabels();
+        this.notifyScoreChange(snapshot);
     }
     updateScoreLabels() {
         this.scoreLabel.textContent = this.score.toString();
         this.highScoreLabel.textContent = this.highScore.toString();
+        this.overallHighScoreLabel.textContent = this.overallHighScore.toString();
+        this.blockSetLabel.textContent = this.blockSetName;
+    }
+    applyHighScoreSnapshot(snapshot) {
+        var _a;
+        this.highScore = (_a = snapshot.perSet[this.blockSetId]) !== null && _a !== void 0 ? _a : 0;
+        this.overallHighScore = snapshot.overall;
+    }
+    notifyScoreChange(snapshot) {
+        const detailSnapshot = snapshot !== null && snapshot !== void 0 ? snapshot : this.highScoreStore.getSnapshot();
+        document.dispatchEvent(new CustomEvent("blockgame:scores", {
+            detail: {
+                blockSetId: this.blockSetId,
+                blockSetName: this.blockSetName,
+                score: this.score,
+                highScore: this.highScore,
+                overallHighScore: this.overallHighScore,
+                snapshot: detailSnapshot
+            }
+        }));
+    }
+    getActiveBlockSetId() {
+        return this.blockSetId;
     }
 }
 class ShaderBackgroundStore {
@@ -1714,13 +1886,21 @@ ShaderBackgroundController.NEW_OPTION_VALUE = "__new";
 /// <reference path="rootScene.ts" />
 /// <reference path="shape.ts" />
 /// <reference path="shapes.ts" />
+/// <reference path="highScore.ts" />
 /// <reference path="game.ts" />
 /// <reference path="shaderBackground.ts" />
+var _a;
 const rootElement = document.getElementById("game-container");
 if (!(rootElement instanceof HTMLElement)) {
     throw new Error("Failed to find the game container element");
 }
-let game = new Game(rootElement);
+const ACTIVE_BLOCK_SET_KEY = "blockgame.activeBlockSet";
+const storedBlockSetId = (_a = localStorage.getItem(ACTIVE_BLOCK_SET_KEY)) !== null && _a !== void 0 ? _a : getDefaultBlockSetId();
+let game = new Game(rootElement, storedBlockSetId);
+let activeBlockSetId = game.getActiveBlockSetId();
+if (activeBlockSetId !== storedBlockSetId) {
+    localStorage.setItem(ACTIVE_BLOCK_SET_KEY, activeBlockSetId);
+}
 const shaderPanel = document.getElementById("shader-panel");
 if (shaderPanel instanceof HTMLElement) {
     new ShaderBackgroundController(shaderPanel);
@@ -1730,6 +1910,10 @@ const settingsOverlay = document.getElementById("settings-overlay");
 const openSettingsButton = document.getElementById("open-settings");
 const closeSettingsButton = document.getElementById("close-settings");
 const newGameButton = document.getElementById("new-game-button");
+const blockSetList = document.getElementById("blockset-list");
+const blockSetCards = new Map();
+const blockSetData = getBlockSets();
+const highScoreStore = new HighScoreStore();
 let lastFocusedElement = null;
 let isScrollLocked = false;
 let lockedScrollY = 0;
@@ -1804,6 +1988,120 @@ newGameButton === null || newGameButton === void 0 ? void 0 : newGameButton.addE
     game.startNewGame();
     setSettingsDrawerState(false);
 });
+const handleBlockSetSelection = (blockSetId) => {
+    var _a;
+    if (!blockSetId || blockSetId === activeBlockSetId) {
+        return;
+    }
+    const targetSet = blockSetData.find(set => set.id === blockSetId);
+    const friendlyName = (_a = targetSet === null || targetSet === void 0 ? void 0 : targetSet.name) !== null && _a !== void 0 ? _a : "this block set";
+    const confirmSwitch = window.confirm(`Switch to ${friendlyName}? This restarts your current game.`);
+    if (!confirmSwitch) {
+        return;
+    }
+    activeBlockSetId = blockSetId;
+    localStorage.setItem(ACTIVE_BLOCK_SET_KEY, activeBlockSetId);
+    game.setBlockSet(blockSetId);
+    updateBlockSetCardState();
+};
+const renderBlockSetControls = () => {
+    var _a, _b;
+    if (!(blockSetList instanceof HTMLElement)) {
+        return;
+    }
+    blockSetList.innerHTML = "";
+    blockSetCards.clear();
+    const snapshot = highScoreStore.getSnapshot();
+    for (const blockSet of blockSetData) {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "blockset-card";
+        card.dataset.blockSetId = blockSet.id;
+        const meta = document.createElement("div");
+        meta.className = "blockset-card__meta";
+        const name = document.createElement("span");
+        name.className = "blockset-card__name";
+        name.textContent = blockSet.name;
+        const scoreLabel = document.createElement("span");
+        scoreLabel.className = "blockset-card__score";
+        const setScore = (_a = snapshot.perSet[blockSet.id]) !== null && _a !== void 0 ? _a : 0;
+        scoreLabel.textContent = `High: ${setScore}`;
+        meta.appendChild(name);
+        meta.appendChild(scoreLabel);
+        const description = document.createElement("p");
+        description.className = "blockset-card__hint";
+        description.textContent = blockSet.description;
+        const preview = document.createElement("div");
+        preview.className = "blockset-card__preview";
+        const previewShapes = ((_b = blockSet.previewShapes) === null || _b === void 0 ? void 0 : _b.length) ? blockSet.previewShapes : blockSet.shapes;
+        previewShapes.forEach(shape => {
+            preview.appendChild(createShapePreview(shape));
+        });
+        card.appendChild(meta);
+        card.appendChild(description);
+        card.appendChild(preview);
+        card.addEventListener("click", () => handleBlockSetSelection(blockSet.id));
+        blockSetList.appendChild(card);
+        blockSetCards.set(blockSet.id, { card, scoreLabel });
+    }
+    updateBlockSetCardState();
+};
+const updateBlockSetCardState = () => {
+    blockSetCards.forEach(({ card }, id) => {
+        const isActive = id === activeBlockSetId;
+        card.classList.toggle("blockset-card--active", isActive);
+        card.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+};
+const updateBlockSetScores = (perSet) => {
+    blockSetCards.forEach(({ scoreLabel }, id) => {
+        var _a;
+        const nextScore = (_a = perSet[id]) !== null && _a !== void 0 ? _a : 0;
+        scoreLabel.textContent = `High: ${nextScore}`;
+    });
+};
+const createShapePreview = (shape) => {
+    const normalized = normalizePreviewShape(shape);
+    if (!normalized.length) {
+        const empty = document.createElement("div");
+        empty.className = "blockset-preview-shape";
+        return empty;
+    }
+    const figure = new Figure(normalized);
+    const cellSize = 16;
+    const width = Math.max(cellSize * figure.width, cellSize);
+    const height = Math.max(cellSize * figure.height, cellSize);
+    const shapeElement = document.createElement("div");
+    shapeElement.className = "blockset-preview-shape";
+    shapeElement.style.width = `${width}px`;
+    shapeElement.style.height = `${height}px`;
+    shapeElement.style.position = "relative";
+    shapeElement.style.margin = "0 0.35rem 0.35rem 0";
+    const nodes = figure.toGameNodes(width, figure.width, cellSize);
+    nodes.forEach(node => {
+        node.element.classList.add("shape-section", "blockset-preview-cell");
+        node.element.style.backgroundColor = "rgba(255, 255, 255, 0.85)";
+        node.element.style.borderColor = "rgba(255, 255, 255, 0.8)";
+        node.addToParent(shapeElement);
+    });
+    return shapeElement;
+};
+const normalizePreviewShape = (shape) => {
+    if (!shape.length) {
+        return [];
+    }
+    let minX = Infinity;
+    let minY = Infinity;
+    for (const point of shape) {
+        if (point.x < minX) {
+            minX = point.x;
+        }
+        if (point.y < minY) {
+            minY = point.y;
+        }
+    }
+    return shape.map(point => new CoordinatePair(point.x - minX, point.y - minY));
+};
 openSettingsButton === null || openSettingsButton === void 0 ? void 0 : openSettingsButton.addEventListener("click", () => setSettingsDrawerState(true));
 closeSettingsButton === null || closeSettingsButton === void 0 ? void 0 : closeSettingsButton.addEventListener("click", () => setSettingsDrawerState(false));
 settingsOverlay === null || settingsOverlay === void 0 ? void 0 : settingsOverlay.addEventListener("click", () => setSettingsDrawerState(false));
@@ -1813,3 +2111,14 @@ document.addEventListener("keydown", (event) => {
     }
 });
 window.addEventListener("resize", () => scheduleLayoutRefresh());
+renderBlockSetControls();
+document.addEventListener("blockgame:scores", (event) => {
+    const scoreEvent = event;
+    if (!scoreEvent.detail) {
+        return;
+    }
+    activeBlockSetId = scoreEvent.detail.blockSetId;
+    localStorage.setItem(ACTIVE_BLOCK_SET_KEY, activeBlockSetId);
+    updateBlockSetCardState();
+    updateBlockSetScores(scoreEvent.detail.snapshot.perSet);
+});

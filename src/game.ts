@@ -7,6 +7,7 @@
 /// <reference path="colors.ts" />
 /// <reference path="smallShape.ts" />
 /// <reference path="effects.ts" />
+/// <reference path="highScore.ts" />
 
 class Game {
     rootScene: RootScene;
@@ -18,14 +19,22 @@ class Game {
     blockTrayHeight: number = 0;
     cellSize: number = 0;
     scoreLabel: HTMLSpanElement;
+    highScoreLabel: HTMLSpanElement;
+    highScoreStore: HighScoreStore;
+    score: number = 0;
+    highScore: number = 0;
     shapesInPlay: SmallShape[] = [];
     constructor(rootElement: HTMLElement) {
         this.scoreLabel = document.getElementById("scoreLabel")!;
+        this.highScoreLabel = document.getElementById("highScoreLabel")!;
+        this.highScoreStore = new HighScoreStore();
+        this.highScore = this.highScoreStore.get();
+        this.updateScoreLabels();
         this.handleSmallShapeClick = this.handleSmallShapeClick.bind(this);
         this.shapeDropped = this.shapeDropped.bind(this);
         this.rootScene = new RootScene(rootElement, this.n);
         this.configureLayout(rootElement);
-        this.addShapes();
+        this.resetGame();
     }
 
     addShapes() {
@@ -111,7 +120,7 @@ class Game {
         let position = smallShape.position;
         let figure = smallShape.figure;
         let color = smallShape.color;
-        this.rootScene.element.removeChild(smallShape.element);
+        smallShape.destroy();
         let shapeConfig: ShapeConfig = {
             index: smallShape.index,
             rootScene: this.rootScene,
@@ -126,7 +135,8 @@ class Game {
 
     shapeDropped(shape: Shape, cells: Cell[]) {
         if (cells.length == 0) {
-            this.addShape(shape.color, shape.index, shape.figure.data);
+            const replacement = this.addShape(shape.color, shape.index, shape.figure.data);
+            this.shapesInPlay = this.shapesInPlay.map(existing => existing.index === shape.index ? replacement : existing);
             shape.remove();
             return;
         }
@@ -137,7 +147,7 @@ class Game {
             cell.setOccupied(true, shape.color);
         }
 
-        this.scoreLabel.textContent = (parseInt(this.scoreLabel.textContent!) + 10).toString();
+        this.incrementScore(10);
 
         const grid = this.rootScene.grid;
         shape.remove();
@@ -163,6 +173,7 @@ class Game {
         if (!canPlay) {
             setTimeout(() => {
                 alert("Game Over!");
+                this.resetGame();
             }, 1000);
         }
 
@@ -180,5 +191,32 @@ class Game {
             }
         }
         return validPositions;
+    }
+
+    private resetGame(): void {
+        for (const shape of this.shapesInPlay) {
+            shape.destroy();
+        }
+        this.shapesInPlay = [];
+        this.rootScene.grid.clearCells(this.rootScene.grid.cells);
+        this.score = 0;
+        this.updateScoreLabels();
+        this.addShapes();
+    }
+
+    private incrementScore(amount: number): void {
+        if (amount <= 0) {
+            return;
+        }
+        this.score += amount;
+        if (this.score > this.highScore) {
+            this.highScore = this.highScoreStore.set(this.score);
+        }
+        this.updateScoreLabels();
+    }
+
+    private updateScoreLabels(): void {
+        this.scoreLabel.textContent = this.score.toString();
+        this.highScoreLabel.textContent = this.highScore.toString();
     }
 }

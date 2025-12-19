@@ -49,4 +49,9 @@ class SmallShape extends GameNode {
         event.preventDefault();
         this.callback(this, event);
     }
+
+    destroy() {
+        this.element.removeEventListener("pointerdown", this.handlePointerDown);
+        this.remove();
+    }
 }

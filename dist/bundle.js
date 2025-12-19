@@ -829,7 +829,38 @@ class SmallShape extends GameNode {
         event.preventDefault();
         this.callback(this, event);
     }
+    destroy() {
+        this.element.removeEventListener("pointerdown", this.handlePointerDown);
+        this.remove();
+    }
 }
+class HighScoreStore {
+    get() {
+        const raw = localStorage.getItem(HighScoreStore.STORAGE_KEY);
+        if (!raw) {
+            return 0;
+        }
+        const parsed = Number.parseInt(raw, 10);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+            return 0;
+        }
+        return parsed;
+    }
+    set(score) {
+        const normalized = Math.max(0, Math.floor(score));
+        localStorage.setItem(HighScoreStore.STORAGE_KEY, normalized.toString());
+        return normalized;
+    }
+    updateIfGreater(score) {
+        const normalized = Math.max(0, Math.floor(score));
+        const current = this.get();
+        if (normalized > current) {
+            return this.set(normalized);
+        }
+        return current;
+    }
+}
+HighScoreStore.STORAGE_KEY = "blockgame.highScore";
 /// <reference path="util.ts" />
 /// <reference path="cell.ts" />
 /// <reference path="grid.ts" />
@@ -839,6 +870,7 @@ class SmallShape extends GameNode {
 /// <reference path="colors.ts" />
 /// <reference path="smallShape.ts" />
 /// <reference path="effects.ts" />
+/// <reference path="highScore.ts" />
 class Game {
     constructor(rootElement) {
         this.n = 10;
@@ -848,13 +880,19 @@ class Game {
         this.blockHeight = 0;
         this.blockTrayHeight = 0;
         this.cellSize = 0;
+        this.score = 0;
+        this.highScore = 0;
         this.shapesInPlay = [];
         this.scoreLabel = document.getElementById("scoreLabel");
+        this.highScoreLabel = document.getElementById("highScoreLabel");
+        this.highScoreStore = new HighScoreStore();
+        this.highScore = this.highScoreStore.get();
+        this.updateScoreLabels();
         this.handleSmallShapeClick = this.handleSmallShapeClick.bind(this);
         this.shapeDropped = this.shapeDropped.bind(this);
         this.rootScene = new RootScene(rootElement, this.n);
         this.configureLayout(rootElement);
-        this.addShapes();
+        this.resetGame();
     }
     addShapes() {
         for (let i = 0; i < 3; i++) {
@@ -932,7 +970,7 @@ class Game {
         let position = smallShape.position;
         let figure = smallShape.figure;
         let color = smallShape.color;
-        this.rootScene.element.removeChild(smallShape.element);
+        smallShape.destroy();
         let shapeConfig = {
             index: smallShape.index,
             rootScene: this.rootScene,
@@ -946,7 +984,8 @@ class Game {
     }
     shapeDropped(shape, cells) {
         if (cells.length == 0) {
-            this.addShape(shape.color, shape.index, shape.figure.data);
+            const replacement = this.addShape(shape.color, shape.index, shape.figure.data);
+            this.shapesInPlay = this.shapesInPlay.map(existing => existing.index === shape.index ? replacement : existing);
             shape.remove();
             return;
         }
@@ -954,7 +993,7 @@ class Game {
         for (let cell of cells) {
             cell.setOccupied(true, shape.color);
         }
-        this.scoreLabel.textContent = (parseInt(this.scoreLabel.textContent) + 10).toString();
+        this.incrementScore(10);
         const grid = this.rootScene.grid;
         shape.remove();
         let cellsToClear = [];
@@ -978,6 +1017,7 @@ class Game {
         if (!canPlay) {
             setTimeout(() => {
                 alert("Game Over!");
+                this.resetGame();
             }, 1000);
         }
     }
@@ -993,6 +1033,30 @@ class Game {
             }
         }
         return validPositions;
+    }
+    resetGame() {
+        for (const shape of this.shapesInPlay) {
+            shape.destroy();
+        }
+        this.shapesInPlay = [];
+        this.rootScene.grid.clearCells(this.rootScene.grid.cells);
+        this.score = 0;
+        this.updateScoreLabels();
+        this.addShapes();
+    }
+    incrementScore(amount) {
+        if (amount <= 0) {
+            return;
+        }
+        this.score += amount;
+        if (this.score > this.highScore) {
+            this.highScore = this.highScoreStore.set(this.score);
+        }
+        this.updateScoreLabels();
+    }
+    updateScoreLabels() {
+        this.scoreLabel.textContent = this.score.toString();
+        this.highScoreLabel.textContent = this.highScore.toString();
     }
 }
 class ShaderBackgroundStore {

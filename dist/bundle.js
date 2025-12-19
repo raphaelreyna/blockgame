@@ -659,6 +659,10 @@ class Shape extends GameNode {
 }
 /// <reference path="util.ts" />
 const DEFAULT_BLOCK_SET_ID = "classic";
+const CUSTOM_BLOCK_SET_STORAGE_KEY = "blockgame.customBlockSets";
+const CUSTOM_BLOCK_SET_ID_PREFIX = "custom";
+const BLUEPRINT_MAX_DIMENSION = 8;
+const DEFAULT_ROTATION_ANGLES = [0, 90, 180, 270];
 const CLASSIC_SHAPE_DEFINITIONS = [
     {
         coordinates: [new CoordinatePair(0, 0)]
@@ -763,7 +767,7 @@ const BLOCK_SET_DEFINITIONS = [
         ]
     }
 ];
-const BLOCK_SETS = BLOCK_SET_DEFINITIONS.map(definition => ({
+const BUILT_IN_BLOCK_SETS = BLOCK_SET_DEFINITIONS.map(definition => ({
     id: definition.id,
     name: definition.name,
     description: definition.description,
@@ -833,14 +837,23 @@ function canonicalKey(points) {
 function cloneShape(points) {
     return points.map(point => new CoordinatePair(point.x, point.y));
 }
+function cloneBlockSetSummary(summary) {
+    return {
+        id: summary.id,
+        name: summary.name,
+        description: summary.description,
+        shapes: summary.shapes.map(cloneShape),
+        previewShapes: summary.previewShapes.map(cloneShape)
+    };
+}
+function getBuiltInBlockSetSummaries() {
+    return BUILT_IN_BLOCK_SETS.map(cloneBlockSetSummary);
+}
+function getCustomBlockSetSummaries() {
+    return readCustomBlockSetRecords().map(convertCustomRecordToSummary);
+}
 function getBlockSets() {
-    return BLOCK_SETS.map(set => ({
-        id: set.id,
-        name: set.name,
-        description: set.description,
-        shapes: set.shapes.map(cloneShape),
-        previewShapes: set.previewShapes.map(cloneShape)
-    }));
+    return [...getBuiltInBlockSetSummaries(), ...getCustomBlockSetSummaries()];
 }
 function getDefaultBlockSetId() {
     return DEFAULT_BLOCK_SET_ID;
@@ -868,12 +881,315 @@ function randomShape() {
     return getRandomShapeForBlockSet(DEFAULT_BLOCK_SET_ID);
 }
 function resolveBlockSet(blockSetId) {
-    const fallback = BLOCK_SETS.find(set => set.id === DEFAULT_BLOCK_SET_ID);
+    const fallback = cloneBlockSetSummary(BUILT_IN_BLOCK_SETS.find(set => set.id === DEFAULT_BLOCK_SET_ID));
     if (!blockSetId) {
         return fallback;
     }
-    const match = BLOCK_SETS.find(set => set.id === blockSetId);
-    return match !== null && match !== void 0 ? match : fallback;
+    const builtInMatch = BUILT_IN_BLOCK_SETS.find(set => set.id === blockSetId);
+    if (builtInMatch) {
+        return cloneBlockSetSummary(builtInMatch);
+    }
+    const customRecord = getCustomBlockSetRecordInternal(blockSetId);
+    if (customRecord) {
+        return convertCustomRecordToSummary(customRecord);
+    }
+    return fallback;
+}
+function getShapeDefinitionsForBlockSet(blockSetId) {
+    const builtIn = BLOCK_SET_DEFINITIONS.find(def => def.id === blockSetId);
+    if (builtIn) {
+        return builtIn.shapes.map(def => ({
+            coordinates: cloneShape(def.coordinates),
+            rotationOptions: def.rotationOptions ? { angles: def.rotationOptions.angles ? [...def.rotationOptions.angles] : undefined } : undefined
+        }));
+    }
+    const custom = getCustomBlockSetRecordInternal(blockSetId);
+    if (!custom) {
+        return [];
+    }
+    return custom.shapes.map(shape => ({
+        coordinates: shape.points.map(point => new CoordinatePair(point.x, point.y)),
+        rotationOptions: { angles: [...shape.rotationAngles] }
+    }));
+}
+function convertCustomRecordToSummary(record) {
+    const definitions = record.shapes.map(shape => ({
+        coordinates: shape.points.map(point => new CoordinatePair(point.x, point.y)),
+        rotationOptions: { angles: [...shape.rotationAngles] }
+    }));
+    return {
+        id: record.id,
+        name: record.name,
+        description: record.description,
+        shapes: buildShapeRoster(definitions),
+        previewShapes: buildPreviewShapes(definitions)
+    };
+}
+function listCustomBlockSets() {
+    return readCustomBlockSetRecords().map(cloneCustomBlockSetRecord).sort((a, b) => a.name.localeCompare(b.name));
+}
+function getCustomBlockSetById(blockSetId) {
+    const record = getCustomBlockSetRecordInternal(blockSetId);
+    return record ? cloneCustomBlockSetRecord(record) : undefined;
+}
+function createCustomBlockSet(name, description = "") {
+    const timestamp = Date.now();
+    const record = {
+        id: generateCustomBlockSetId(),
+        name: sanitizeBlockSetName(name),
+        description: typeof description === "string" ? description.trim() : "",
+        shapes: [],
+        createdAt: timestamp,
+        updatedAt: timestamp
+    };
+    const existing = readCustomBlockSetRecords();
+    existing.push(record);
+    writeCustomBlockSetRecords(existing);
+    return cloneCustomBlockSetRecord(record);
+}
+function saveCustomBlockSet(record) {
+    const normalized = normalizeCustomBlockSetRecord(record, false);
+    normalized.updatedAt = Date.now();
+    const existing = readCustomBlockSetRecords();
+    const index = existing.findIndex(entry => entry.id === normalized.id);
+    if (index >= 0) {
+        existing[index] = normalized;
+    }
+    else {
+        existing.push(normalized);
+    }
+    writeCustomBlockSetRecords(existing);
+    return cloneCustomBlockSetRecord(normalized);
+}
+function deleteCustomBlockSet(blockSetId) {
+    const existing = readCustomBlockSetRecords();
+    const next = existing.filter(entry => entry.id !== blockSetId);
+    if (next.length === existing.length) {
+        return false;
+    }
+    writeCustomBlockSetRecords(next);
+    return true;
+}
+function buildCustomShapeRecord(input) {
+    var _a, _b;
+    if (!input.blueprint && !input.coordinates) {
+        throw new Error("Shape input must include a blueprint or coordinates.");
+    }
+    let coordinates;
+    let blueprint;
+    if (input.blueprint) {
+        const parsed = parseShapeBlueprint(input.blueprint);
+        coordinates = parsed.coordinates;
+        blueprint = parsed.blueprint;
+    }
+    else {
+        const normalized = normalizeShape(((_a = input.coordinates) !== null && _a !== void 0 ? _a : []).map(point => new CoordinatePair(point.x, point.y)));
+        coordinates = normalized;
+        blueprint = shapeToBlueprint(normalized);
+    }
+    const timestamp = Date.now();
+    return {
+        id: generateCustomShapeId(),
+        label: sanitizeShapeLabel(input.label),
+        blueprint: blueprint,
+        points: coordinates.map(point => ({ x: point.x, y: point.y })),
+        rotationAngles: ensureRotationAngles((_b = input.rotationAngles) !== null && _b !== void 0 ? _b : [0]),
+        createdAt: timestamp,
+        updatedAt: timestamp
+    };
+}
+function parseShapeBlueprint(blueprint) {
+    const rows = (blueprint !== null && blueprint !== void 0 ? blueprint : "")
+        .split(/\r?\n/)
+        .map(line => line.replace(/\t/g, " ").replace(/\s+$/, ""))
+        .filter(line => line.trim().length > 0);
+    if (rows.length === 0) {
+        throw new Error("Provide at least one row of characters.");
+    }
+    if (rows.length > BLUEPRINT_MAX_DIMENSION) {
+        throw new Error(`Blueprints are limited to ${BLUEPRINT_MAX_DIMENSION} rows.`);
+    }
+    const coordinates = [];
+    let width = 0;
+    rows.forEach((row, rowIndex) => {
+        if (row.length > BLUEPRINT_MAX_DIMENSION) {
+            throw new Error(`Each row is limited to ${BLUEPRINT_MAX_DIMENSION} characters.`);
+        }
+        width = Math.max(width, row.length);
+        for (let col = 0; col < row.length; col++) {
+            const char = row[col];
+            if (isFilledBlueprintChar(char)) {
+                coordinates.push(new CoordinatePair(col, rowIndex));
+            }
+        }
+    });
+    if (coordinates.length === 0) {
+        throw new Error("Use #, X, or 1 to mark filled cells.");
+    }
+    const normalized = normalizeShape(coordinates);
+    const normalizedBlueprint = shapeToBlueprint(normalized);
+    return {
+        blueprint: normalizedBlueprint,
+        coordinates: normalized,
+        width,
+        height: rows.length
+    };
+}
+function describeShapeRotations(points) {
+    const normalized = normalizeShape(points);
+    const seen = new Set();
+    const baseKey = canonicalKey(normalized);
+    const descriptors = [];
+    for (const angle of DEFAULT_ROTATION_ANGLES) {
+        let rotated = normalized;
+        const turns = (angle / 90) | 0;
+        for (let i = 0; i < turns; i++) {
+            rotated = rotateQuarterTurn(rotated);
+        }
+        rotated = normalizeShape(rotated);
+        const key = canonicalKey(rotated);
+        const isRedundant = seen.has(key);
+        descriptors.push({
+            angle,
+            coordinates: rotated.map(point => new CoordinatePair(point.x, point.y)),
+            key,
+            isDuplicateOfBase: key === baseKey && angle !== 0,
+            isRedundant
+        });
+        if (!seen.has(key)) {
+            seen.add(key);
+        }
+    }
+    return descriptors;
+}
+function shapeToBlueprint(points) {
+    if (points.length === 0) {
+        return "";
+    }
+    const width = Math.max(...points.map(point => point.x)) + 1;
+    const height = Math.max(...points.map(point => point.y)) + 1;
+    const grid = [];
+    for (let r = 0; r < height; r++) {
+        grid[r] = [];
+        for (let c = 0; c < width; c++) {
+            grid[r][c] = ".";
+        }
+    }
+    for (const point of points) {
+        grid[point.y][point.x] = "#";
+    }
+    return grid.map(row => row.join("")).join("\n");
+}
+function ensureRotationAngles(angles) {
+    const normalized = angles
+        .map(angle => ((angle % 360) + 360) % 360)
+        .filter(angle => angle % 90 === 0);
+    const unique = Array.from(new Set(normalized));
+    if (!unique.includes(0)) {
+        unique.unshift(0);
+    }
+    return unique.slice(0, DEFAULT_ROTATION_ANGLES.length);
+}
+function sanitizeBlockSetName(name) {
+    const trimmed = (name !== null && name !== void 0 ? name : "").trim();
+    return trimmed.length > 0 ? trimmed : "Custom Block Set";
+}
+function sanitizeShapeLabel(label) {
+    const trimmed = (label !== null && label !== void 0 ? label : "").trim();
+    return trimmed.length > 0 ? trimmed : "Custom Shape";
+}
+function isFilledBlueprintChar(char) {
+    return char === "#" || char === "X" || char === "x" || char === "1" || char === "@";
+}
+function generateCustomBlockSetId() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+        return `${CUSTOM_BLOCK_SET_ID_PREFIX}-${crypto.randomUUID()}`;
+    }
+    return `${CUSTOM_BLOCK_SET_ID_PREFIX}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000000)}`;
+}
+function generateCustomShapeId() {
+    return `shape-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000000)}`;
+}
+function cloneCustomBlockSetRecord(record) {
+    return {
+        id: record.id,
+        name: record.name,
+        description: record.description,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
+        shapes: record.shapes.map(shape => ({
+            id: shape.id,
+            label: shape.label,
+            blueprint: shape.blueprint,
+            rotationAngles: [...shape.rotationAngles],
+            createdAt: shape.createdAt,
+            updatedAt: shape.updatedAt,
+            points: shape.points.map(point => ({ x: point.x, y: point.y }))
+        }))
+    };
+}
+function getCustomBlockSetRecordInternal(blockSetId) {
+    const records = readCustomBlockSetRecords();
+    const match = records.find(entry => entry.id === blockSetId);
+    return match ? Object.assign(Object.assign({}, match), { shapes: match.shapes.map(shape => (Object.assign(Object.assign({}, shape), { rotationAngles: [...shape.rotationAngles], points: shape.points.map(point => ({ x: point.x, y: point.y })) }))) }) : null;
+}
+function readCustomBlockSetRecords() {
+    const raw = localStorage.getItem(CUSTOM_BLOCK_SET_STORAGE_KEY);
+    if (!raw) {
+        return [];
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+        return parsed.map(record => normalizeCustomBlockSetRecord(record, true));
+    }
+    catch (_error) {
+        return [];
+    }
+}
+function writeCustomBlockSetRecords(records) {
+    localStorage.setItem(CUSTOM_BLOCK_SET_STORAGE_KEY, JSON.stringify(records));
+}
+function normalizeCustomBlockSetRecord(record, preserveTimestamps) {
+    var _a;
+    const createdAt = preserveTimestamps && Number.isFinite(record === null || record === void 0 ? void 0 : record.createdAt) ? record.createdAt : Date.now();
+    const updatedAt = preserveTimestamps && Number.isFinite(record === null || record === void 0 ? void 0 : record.updatedAt) ? record.updatedAt : createdAt;
+    const normalizedShapes = Array.isArray(record === null || record === void 0 ? void 0 : record.shapes)
+        ? record.shapes.map(shape => normalizeCustomBlockSetShape(shape, preserveTimestamps)).filter(Boolean)
+        : [];
+    return {
+        id: typeof (record === null || record === void 0 ? void 0 : record.id) === "string" && record.id.length > 0 ? record.id : generateCustomBlockSetId(),
+        name: sanitizeBlockSetName((_a = record === null || record === void 0 ? void 0 : record.name) !== null && _a !== void 0 ? _a : ""),
+        description: typeof (record === null || record === void 0 ? void 0 : record.description) === "string" ? record.description : "",
+        shapes: normalizedShapes,
+        createdAt,
+        updatedAt
+    };
+}
+function normalizeCustomBlockSetShape(shape, preserveTimestamps) {
+    if (!shape || !Array.isArray(shape.points) || shape.points.length === 0) {
+        return null;
+    }
+    const normalizedPoints = shape.points
+        .filter(point => Number.isFinite(point === null || point === void 0 ? void 0 : point.x) && Number.isFinite(point === null || point === void 0 ? void 0 : point.y))
+        .map(point => ({ x: Math.floor(point.x), y: Math.floor(point.y) }));
+    if (normalizedPoints.length === 0) {
+        return null;
+    }
+    const normalizedAngles = ensureRotationAngles(Array.isArray(shape.rotationAngles) ? shape.rotationAngles : [0]);
+    const createdAt = preserveTimestamps && Number.isFinite(shape.createdAt) ? shape.createdAt : Date.now();
+    const updatedAt = preserveTimestamps && Number.isFinite(shape.updatedAt) ? shape.updatedAt : createdAt;
+    return {
+        id: typeof shape.id === "string" && shape.id.length > 0 ? shape.id : generateCustomShapeId(),
+        label: sanitizeShapeLabel(shape.label),
+        blueprint: typeof shape.blueprint === "string" && shape.blueprint.length > 0 ? shape.blueprint : shapeToBlueprint(normalizedPoints.map(point => new CoordinatePair(point.x, point.y))),
+        points: normalizedPoints,
+        rotationAngles: normalizedAngles,
+        createdAt,
+        updatedAt
+    };
 }
 /// <reference path="util.ts" />
 /// <reference path="grid.ts" />
@@ -1912,12 +2228,35 @@ const closeSettingsButton = document.getElementById("close-settings");
 const newGameButton = document.getElementById("new-game-button");
 const blockSetList = document.getElementById("blockset-list");
 const blockSetCards = new Map();
-const blockSetData = getBlockSets();
+let blockSetData = getBlockSets();
+const customBlockSetSelect = document.getElementById("custom-blockset-select");
+const customBlockSetNameInput = document.getElementById("custom-blockset-name");
+const customBlockSetDescriptionInput = document.getElementById("custom-blockset-description");
+const customBlockSetCreateButton = document.getElementById("custom-blockset-create");
+const customBlockSetEmptyCreateButton = document.getElementById("custom-blockset-empty-create");
+const customBlockSetSaveButton = document.getElementById("custom-blockset-save");
+const customBlockSetDeleteButton = document.getElementById("custom-blockset-delete");
+const customBlockSetsBody = document.getElementById("custom-blocksets-body");
+const customBlockSetsEmpty = document.getElementById("custom-blocksets-empty");
+const customShapeLabelInput = document.getElementById("custom-shape-label");
+const customShapeBlueprintInput = document.getElementById("custom-shape-blueprint");
+const customShapePreview = document.getElementById("custom-shape-preview");
+const customShapeRotations = document.getElementById("custom-shape-rotations");
+const customShapeAddButton = document.getElementById("custom-shape-add");
+const customShapeStatus = document.getElementById("custom-shape-status");
+const customShapeList = document.getElementById("custom-shape-list");
+const customImportSource = document.getElementById("custom-import-source");
+const customImportHint = document.getElementById("custom-import-hint");
+const customImportApplyButton = document.getElementById("custom-import-apply");
 const highScoreStore = new HighScoreStore();
 let lastFocusedElement = null;
 let isScrollLocked = false;
 let lockedScrollY = 0;
 let layoutRefreshTimer = null;
+let customSets = listCustomBlockSets();
+let activeEditorSetId = customSets.length > 0 ? customSets[0].id : null;
+let currentBlueprintParse = null;
+let draftRotationAngles = new Set([0]);
 const refreshGameLayout = () => {
     game.configureLayout(rootElement);
 };
@@ -2135,6 +2474,520 @@ const normalizePreviewShape = (shape) => {
     }
     return shape.map(point => new CoordinatePair(point.x - minX, point.y - minY));
 };
+const refreshBlockSetList = () => {
+    blockSetData = getBlockSets();
+    renderBlockSetControls();
+    ensureActiveCardVisibility();
+    populateImportSources();
+};
+const syncCustomEditorState = () => {
+    customSets = listCustomBlockSets();
+    if (!customSets.some(set => set.id === activeEditorSetId)) {
+        activeEditorSetId = customSets.length > 0 ? customSets[0].id : null;
+    }
+    toggleCustomSetVisibility();
+    populateCustomSetSelect();
+    hydrateCustomSetForm();
+    renderShapeBuilderPreview();
+    populateImportSources();
+};
+const toggleCustomSetVisibility = () => {
+    const hasSets = customSets.length > 0;
+    if (customBlockSetsBody instanceof HTMLElement) {
+        customBlockSetsBody.hidden = !hasSets;
+    }
+    if (customBlockSetsEmpty instanceof HTMLElement) {
+        customBlockSetsEmpty.hidden = hasSets;
+    }
+    const shouldDisable = !hasSets;
+    customBlockSetSelect && (customBlockSetSelect.disabled = shouldDisable);
+    customBlockSetSaveButton && (customBlockSetSaveButton.disabled = shouldDisable);
+    customBlockSetDeleteButton && (customBlockSetDeleteButton.disabled = shouldDisable);
+    updateShapeBuilderButtonState();
+    updateImportButtonAvailability(false);
+};
+const populateCustomSetSelect = () => {
+    if (!(customBlockSetSelect instanceof HTMLSelectElement)) {
+        return;
+    }
+    customBlockSetSelect.innerHTML = "";
+    if (!customSets.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No custom sets yet";
+        option.disabled = true;
+        option.selected = true;
+        customBlockSetSelect.appendChild(option);
+        return;
+    }
+    for (const set of customSets) {
+        const option = document.createElement("option");
+        option.value = set.id;
+        option.textContent = set.name;
+        customBlockSetSelect.appendChild(option);
+    }
+    if (activeEditorSetId) {
+        customBlockSetSelect.value = activeEditorSetId;
+    }
+};
+const hydrateCustomSetForm = () => {
+    var _a, _b;
+    const activeSet = activeEditorSetId ? customSets.find(set => set.id === activeEditorSetId) : undefined;
+    if (customBlockSetNameInput) {
+        customBlockSetNameInput.value = (_a = activeSet === null || activeSet === void 0 ? void 0 : activeSet.name) !== null && _a !== void 0 ? _a : "";
+        customBlockSetNameInput.disabled = !activeSet;
+    }
+    if (customBlockSetDescriptionInput) {
+        customBlockSetDescriptionInput.value = (_b = activeSet === null || activeSet === void 0 ? void 0 : activeSet.description) !== null && _b !== void 0 ? _b : "";
+        customBlockSetDescriptionInput.disabled = !activeSet;
+    }
+    renderCustomShapeList(activeSet);
+};
+const renderCustomShapeList = (activeSet) => {
+    if (!(customShapeList instanceof HTMLElement)) {
+        return;
+    }
+    customShapeList.innerHTML = "";
+    if (!activeSet || activeSet.shapes.length === 0) {
+        const placeholder = document.createElement("p");
+        placeholder.className = "custom-blocksets__hint";
+        placeholder.textContent = activeSet ? "No shapes yet. Add one using the blueprint editor." : "Create a custom set to start adding shapes.";
+        customShapeList.appendChild(placeholder);
+        return;
+    }
+    for (const shape of activeSet.shapes) {
+        const card = document.createElement("article");
+        card.className = "custom-shape-card";
+        card.dataset.shapeId = shape.id;
+        const meta = document.createElement("div");
+        meta.className = "custom-shape-card__meta";
+        const label = document.createElement("span");
+        label.className = "custom-shape-card__label";
+        label.textContent = shape.label;
+        const removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "ghost-button ghost-button--compact";
+        removeButton.textContent = "Remove";
+        removeButton.addEventListener("click", () => handleShapeDeletion(shape.id));
+        meta.appendChild(label);
+        meta.appendChild(removeButton);
+        card.appendChild(meta);
+        const previewHost = document.createElement("div");
+        previewHost.className = "custom-shape-preview";
+        previewHost.appendChild(createShapePreview(convertPointsToCoordinates(shape.points)));
+        card.appendChild(previewHost);
+        const rotationsWrapper = document.createElement("div");
+        rotationsWrapper.className = "custom-shape-card__rotations";
+        const descriptors = describeShapeRotations(convertPointsToCoordinates(shape.points));
+        for (const descriptor of descriptors) {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "rotation-chip";
+            chip.textContent = `${descriptor.angle}°`;
+            chip.dataset.angle = descriptor.angle.toString();
+            chip.dataset.shapeId = shape.id;
+            const isDisabled = descriptor.isDuplicateOfBase || descriptor.isRedundant;
+            if (isDisabled) {
+                chip.classList.add("is-disabled");
+                chip.disabled = true;
+            }
+            const isActive = shape.rotationAngles.includes(descriptor.angle);
+            if (isActive) {
+                chip.classList.add("is-active");
+            }
+            chip.addEventListener("click", () => handleShapeRotationToggle(shape.id, descriptor.angle));
+            rotationsWrapper.appendChild(chip);
+        }
+        card.appendChild(rotationsWrapper);
+        customShapeList.appendChild(card);
+    }
+};
+const convertPointsToCoordinates = (points) => {
+    return points.map(point => new CoordinatePair(point.x, point.y));
+};
+const collectRotationKeys = (points) => {
+    const descriptors = describeShapeRotations(points);
+    const keys = [];
+    const seen = new Set();
+    for (const descriptor of descriptors) {
+        if (seen.has(descriptor.key)) {
+            continue;
+        }
+        seen.add(descriptor.key);
+        keys.push(descriptor.key);
+    }
+    return keys;
+};
+const buildShapeKeySet = (record) => {
+    const keys = new Set();
+    if (!record) {
+        return keys;
+    }
+    for (const shape of record.shapes) {
+        const shapePoints = convertPointsToCoordinates(shape.points);
+        collectRotationKeys(shapePoints).forEach(key => keys.add(key));
+    }
+    return keys;
+};
+const hasShapeCollision = (keys, candidate) => {
+    return collectRotationKeys(candidate).some(key => keys.has(key));
+};
+const appendShapeKeys = (keys, candidate) => {
+    collectRotationKeys(candidate).forEach(key => keys.add(key));
+};
+const handleShapeDeletion = (shapeId) => {
+    if (!activeEditorSetId) {
+        return;
+    }
+    updateActiveCustomSet(record => {
+        record.shapes = record.shapes.filter(shape => shape.id !== shapeId);
+    });
+};
+const handleShapeRotationToggle = (shapeId, angle) => {
+    if (!activeEditorSetId) {
+        return;
+    }
+    updateActiveCustomSet(record => {
+        const targetShape = record.shapes.find(shape => shape.id === shapeId);
+        if (!targetShape) {
+            return;
+        }
+        const nextAngles = new Set(targetShape.rotationAngles);
+        if (nextAngles.has(angle)) {
+            if (angle === 0 || nextAngles.size === 1) {
+                return;
+            }
+            nextAngles.delete(angle);
+        }
+        else {
+            nextAngles.add(angle);
+        }
+        targetShape.rotationAngles = normalizeRotationSelection(nextAngles);
+        targetShape.updatedAt = Date.now();
+    });
+};
+const updateActiveCustomSet = (mutator) => {
+    if (!activeEditorSetId) {
+        return;
+    }
+    const working = getCustomBlockSetById(activeEditorSetId);
+    if (!working) {
+        return;
+    }
+    mutator(working);
+    saveCustomBlockSet(working);
+    syncCustomEditorState();
+    refreshBlockSetList();
+};
+const normalizeRotationSelection = (angles) => {
+    const normalized = [];
+    for (const angle of angles) {
+        const deg = ((angle % 360) + 360) % 360;
+        if (deg % 90 !== 0) {
+            continue;
+        }
+        if (!normalized.includes(deg)) {
+            normalized.push(deg);
+        }
+    }
+    if (!normalized.includes(0)) {
+        normalized.unshift(0);
+    }
+    normalized.sort((a, b) => a - b);
+    return normalized.slice(0, 4);
+};
+const renderShapeBuilderPreview = () => {
+    var _a;
+    if (!(customShapePreview instanceof HTMLElement) || !(customShapeRotations instanceof HTMLElement)) {
+        return;
+    }
+    customShapePreview.innerHTML = "";
+    customShapeRotations.innerHTML = "";
+    currentBlueprintParse = null;
+    draftRotationAngles = new Set([0]);
+    const blueprintValue = (_a = customShapeBlueprintInput === null || customShapeBlueprintInput === void 0 ? void 0 : customShapeBlueprintInput.value) !== null && _a !== void 0 ? _a : "";
+    if (!blueprintValue.trim()) {
+        setShapeStatus("Draw a blueprint to get started.");
+        updateShapeBuilderButtonState();
+        return;
+    }
+    try {
+        const parsed = parseShapeBlueprint(blueprintValue);
+        currentBlueprintParse = parsed;
+        const previewElement = createShapePreview(parsed.coordinates);
+        customShapePreview.appendChild(previewElement);
+        renderBuilderRotationOptions(parsed.coordinates);
+        setShapeStatus("", false);
+    }
+    catch (error) {
+        setShapeStatus(error instanceof Error ? error.message : "Invalid blueprint.");
+    }
+    updateShapeBuilderButtonState();
+};
+const renderBuilderRotationOptions = (points) => {
+    if (!(customShapeRotations instanceof HTMLElement)) {
+        return;
+    }
+    customShapeRotations.innerHTML = "";
+    const descriptors = describeShapeRotations(points);
+    for (const descriptor of descriptors) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "shape-rotation-option";
+        button.dataset.angle = descriptor.angle.toString();
+        button.setAttribute("aria-pressed", draftRotationAngles.has(descriptor.angle) ? "true" : "false");
+        if (descriptor.isDuplicateOfBase || descriptor.isRedundant) {
+            button.classList.add("shape-rotation-option--disabled");
+            button.disabled = true;
+        }
+        if (draftRotationAngles.has(descriptor.angle)) {
+            button.classList.add("shape-rotation-option--selected");
+        }
+        const label = document.createElement("span");
+        label.className = "shape-rotation-option__label";
+        label.textContent = `${descriptor.angle}°`;
+        const preview = document.createElement("div");
+        preview.className = "shape-rotation-option__preview";
+        preview.appendChild(createShapePreview(descriptor.coordinates));
+        button.appendChild(label);
+        button.appendChild(preview);
+        button.addEventListener("click", () => toggleDraftRotation(descriptor.angle, button));
+        customShapeRotations.appendChild(button);
+    }
+};
+const toggleDraftRotation = (angle, element) => {
+    if (element.classList.contains("shape-rotation-option--disabled")) {
+        return;
+    }
+    const isActive = draftRotationAngles.has(angle);
+    if (isActive) {
+        if (angle === 0 || draftRotationAngles.size === 1) {
+            return;
+        }
+        draftRotationAngles.delete(angle);
+        element.classList.remove("shape-rotation-option--selected");
+        element.setAttribute("aria-pressed", "false");
+    }
+    else {
+        draftRotationAngles.add(angle);
+        element.classList.add("shape-rotation-option--selected");
+        element.setAttribute("aria-pressed", "true");
+    }
+    updateShapeBuilderButtonState();
+};
+const updateShapeBuilderButtonState = () => {
+    if (!customShapeAddButton) {
+        return;
+    }
+    const isReady = Boolean(activeEditorSetId && currentBlueprintParse && draftRotationAngles.size > 0);
+    customShapeAddButton.disabled = !isReady;
+};
+const setShapeStatus = (message, isError = true) => {
+    if (!(customShapeStatus instanceof HTMLElement)) {
+        return;
+    }
+    customShapeStatus.textContent = message;
+    if (message) {
+        customShapeStatus.classList.toggle("is-success", !isError);
+    }
+    else {
+        customShapeStatus.classList.remove("is-success");
+    }
+};
+const handleAddCustomShape = () => {
+    var _a;
+    if (!activeEditorSetId || !currentBlueprintParse) {
+        return;
+    }
+    const target = getCustomBlockSetById(activeEditorSetId);
+    if (!target) {
+        return;
+    }
+    const normalizedCoordinates = currentBlueprintParse.coordinates.map(point => new CoordinatePair(point.x, point.y));
+    const existingKeys = buildShapeKeySet(target);
+    if (hasShapeCollision(existingKeys, normalizedCoordinates)) {
+        setShapeStatus("That shape (or one of its rotations) already exists in this set.");
+        return;
+    }
+    const label = (_a = customShapeLabelInput === null || customShapeLabelInput === void 0 ? void 0 : customShapeLabelInput.value.trim()) !== null && _a !== void 0 ? _a : "";
+    const rotationAngles = normalizeRotationSelection(draftRotationAngles);
+    const newShape = buildCustomShapeRecord({
+        label,
+        blueprint: currentBlueprintParse.blueprint,
+        rotationAngles
+    });
+    target.shapes.push(newShape);
+    saveCustomBlockSet(target);
+    if (customShapeLabelInput) {
+        customShapeLabelInput.value = "";
+    }
+    if (customShapeBlueprintInput) {
+        customShapeBlueprintInput.value = "";
+    }
+    currentBlueprintParse = null;
+    draftRotationAngles = new Set([0]);
+    setShapeStatus(`Added ${newShape.label} to ${target.name}.`, false);
+    syncCustomEditorState();
+    refreshBlockSetList();
+};
+const handleCreateCustomSet = () => {
+    const defaultName = `Custom Set ${customSets.length + 1}`;
+    const newSet = createCustomBlockSet(defaultName);
+    activeEditorSetId = newSet.id;
+    syncCustomEditorState();
+    refreshBlockSetList();
+    window.setTimeout(() => customBlockSetNameInput === null || customBlockSetNameInput === void 0 ? void 0 : customBlockSetNameInput.focus(), 0);
+};
+const handleSaveCustomSet = () => {
+    var _a, _b;
+    if (!activeEditorSetId) {
+        return;
+    }
+    const record = getCustomBlockSetById(activeEditorSetId);
+    if (!record) {
+        return;
+    }
+    const nextName = ((_a = customBlockSetNameInput === null || customBlockSetNameInput === void 0 ? void 0 : customBlockSetNameInput.value) !== null && _a !== void 0 ? _a : "").trim();
+    record.name = nextName.length > 0 ? nextName : record.name;
+    record.description = (_b = customBlockSetDescriptionInput === null || customBlockSetDescriptionInput === void 0 ? void 0 : customBlockSetDescriptionInput.value) !== null && _b !== void 0 ? _b : "";
+    saveCustomBlockSet(record);
+    if (record.id === activeBlockSetId) {
+        game.blockSetName = record.name;
+        game.blockSetLabel.textContent = record.name;
+    }
+    syncCustomEditorState();
+    refreshBlockSetList();
+};
+const handleDeleteCustomSet = () => {
+    var _a;
+    if (!activeEditorSetId) {
+        return;
+    }
+    const target = customSets.find(set => set.id === activeEditorSetId);
+    const friendlyName = (_a = target === null || target === void 0 ? void 0 : target.name) !== null && _a !== void 0 ? _a : "this block set";
+    const confirmRemoval = window.confirm(`Delete ${friendlyName}? This cannot be undone.`);
+    if (!confirmRemoval) {
+        return;
+    }
+    deleteCustomBlockSet(activeEditorSetId);
+    if (activeBlockSetId === activeEditorSetId) {
+        activeBlockSetId = getDefaultBlockSetId();
+        localStorage.setItem(ACTIVE_BLOCK_SET_KEY, activeBlockSetId);
+        game.setBlockSet(activeBlockSetId);
+    }
+    activeEditorSetId = null;
+    syncCustomEditorState();
+    refreshBlockSetList();
+};
+const populateImportSources = () => {
+    if (!(customImportSource instanceof HTMLSelectElement)) {
+        setImportHintMessage("Import controls unavailable.");
+        updateImportButtonAvailability(false);
+        return;
+    }
+    const availableSources = blockSetData.filter(set => set.id !== activeEditorSetId);
+    customImportSource.innerHTML = "";
+    if (!availableSources.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No other block sets available";
+        option.disabled = true;
+        option.selected = true;
+        customImportSource.appendChild(option);
+        customImportSource.disabled = true;
+        setImportHintMessage("Create or select another block set to import from.");
+        updateImportButtonAvailability(false);
+        return;
+    }
+    customImportSource.disabled = false;
+    for (const set of availableSources) {
+        const option = document.createElement("option");
+        option.value = set.id;
+        option.textContent = set.name;
+        customImportSource.appendChild(option);
+    }
+    if (!customImportSource.value && availableSources.length > 0) {
+        customImportSource.value = availableSources[0].id;
+    }
+    setImportHintMessage(buildImportHint());
+    updateImportButtonAvailability(Boolean(customImportSource.value));
+};
+const buildImportHint = () => {
+    const sourceId = customImportSource instanceof HTMLSelectElement ? customImportSource.value : "";
+    if (!sourceId) {
+        return "Choose a source to copy every shape (rotations included).";
+    }
+    const sourceName = getBlockSetName(sourceId);
+    return `Every shape from ${sourceName} will be added below. Remove any you don't want afterwards.`;
+};
+const setImportHintMessage = (message) => {
+    if (customImportHint instanceof HTMLElement) {
+        customImportHint.textContent = message;
+    }
+};
+const updateImportButtonAvailability = (hasSource) => {
+    if (!customImportApplyButton) {
+        return;
+    }
+    const canImport = Boolean(activeEditorSetId && hasSource);
+    customImportApplyButton.disabled = !canImport;
+};
+const handleImportSubmit = () => {
+    if (!activeEditorSetId || !(customImportSource instanceof HTMLSelectElement)) {
+        return;
+    }
+    const sourceId = customImportSource.value;
+    if (!sourceId) {
+        return;
+    }
+    const target = getCustomBlockSetById(activeEditorSetId);
+    if (!target) {
+        return;
+    }
+    const definitions = getShapeDefinitionsForBlockSet(sourceId);
+    if (!definitions.length) {
+        setShapeStatus("Selected block set has no shapes to import.");
+        return;
+    }
+    const sourceName = getBlockSetName(sourceId);
+    const existingKeys = buildShapeKeySet(target);
+    const additions = [];
+    let skippedDuplicates = 0;
+    definitions.forEach((definition, index) => {
+        var _a;
+        const normalizedCoordinates = normalizeShape(definition.coordinates.map(point => new CoordinatePair(point.x, point.y)));
+        if (hasShapeCollision(existingKeys, normalizedCoordinates)) {
+            skippedDuplicates++;
+            return;
+        }
+        const rotationAngles = ((_a = definition.rotationOptions) === null || _a === void 0 ? void 0 : _a.angles) && definition.rotationOptions.angles.length > 0
+            ? [...definition.rotationOptions.angles]
+            : [0, 90, 180, 270];
+        const shapeRecord = buildCustomShapeRecord({
+            label: `${sourceName} ${index + 1}`,
+            coordinates: normalizedCoordinates,
+            rotationAngles
+        });
+        additions.push(shapeRecord);
+        appendShapeKeys(existingKeys, normalizedCoordinates);
+    });
+    if (!additions.length) {
+        setShapeStatus("All shapes from that block set already exist here.");
+        return;
+    }
+    target.shapes.push(...additions);
+    saveCustomBlockSet(target);
+    const message = skippedDuplicates > 0
+        ? `Imported ${additions.length} shapes from ${sourceName} (skipped ${skippedDuplicates} duplicates).`
+        : `Imported ${additions.length} shapes from ${sourceName}.`;
+    setShapeStatus(message, false);
+    syncCustomEditorState();
+    refreshBlockSetList();
+};
+const getBlockSetName = (blockSetId) => {
+    var _a, _b;
+    return (_b = (_a = blockSetData.find(set => set.id === blockSetId)) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : "Block Set";
+};
 openSettingsButton === null || openSettingsButton === void 0 ? void 0 : openSettingsButton.addEventListener("click", () => setSettingsDrawerState(true));
 closeSettingsButton === null || closeSettingsButton === void 0 ? void 0 : closeSettingsButton.addEventListener("click", () => setSettingsDrawerState(false));
 settingsOverlay === null || settingsOverlay === void 0 ? void 0 : settingsOverlay.addEventListener("click", () => setSettingsDrawerState(false));
@@ -2143,9 +2996,31 @@ document.addEventListener("keydown", (event) => {
         setSettingsDrawerState(false);
     }
 });
+customBlockSetCreateButton === null || customBlockSetCreateButton === void 0 ? void 0 : customBlockSetCreateButton.addEventListener("click", handleCreateCustomSet);
+customBlockSetEmptyCreateButton === null || customBlockSetEmptyCreateButton === void 0 ? void 0 : customBlockSetEmptyCreateButton.addEventListener("click", handleCreateCustomSet);
+customBlockSetSelect === null || customBlockSetSelect === void 0 ? void 0 : customBlockSetSelect.addEventListener("change", event => {
+    if (!(event.target instanceof HTMLSelectElement)) {
+        return;
+    }
+    activeEditorSetId = event.target.value || null;
+    syncCustomEditorState();
+});
+customBlockSetSaveButton === null || customBlockSetSaveButton === void 0 ? void 0 : customBlockSetSaveButton.addEventListener("click", handleSaveCustomSet);
+customBlockSetDeleteButton === null || customBlockSetDeleteButton === void 0 ? void 0 : customBlockSetDeleteButton.addEventListener("click", handleDeleteCustomSet);
+customShapeBlueprintInput === null || customShapeBlueprintInput === void 0 ? void 0 : customShapeBlueprintInput.addEventListener("input", () => renderShapeBuilderPreview());
+customShapeLabelInput === null || customShapeLabelInput === void 0 ? void 0 : customShapeLabelInput.addEventListener("input", () => setShapeStatus(""));
+customShapeAddButton === null || customShapeAddButton === void 0 ? void 0 : customShapeAddButton.addEventListener("click", handleAddCustomShape);
+customImportSource === null || customImportSource === void 0 ? void 0 : customImportSource.addEventListener("change", event => {
+    if (!(event.target instanceof HTMLSelectElement)) {
+        return;
+    }
+    setImportHintMessage(buildImportHint());
+    updateImportButtonAvailability(Boolean(event.target.value));
+});
+customImportApplyButton === null || customImportApplyButton === void 0 ? void 0 : customImportApplyButton.addEventListener("click", handleImportSubmit);
 window.addEventListener("resize", () => scheduleLayoutRefresh());
-renderBlockSetControls();
-ensureActiveCardVisibility();
+refreshBlockSetList();
+syncCustomEditorState();
 document.addEventListener("blockgame:scores", (event) => {
     const scoreEvent = event;
     if (!scoreEvent.detail) {

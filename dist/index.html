@@ -166,6 +166,25 @@
             .blockset-card {
                 padding: 0.85rem;
             }
+
+            .custom-blocksets__field-grid,
+            .custom-shape-builder__editor {
+                grid-template-columns: 1fr;
+            }
+
+            .custom-shape-builder__actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .rotation-option-list {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            }
+
+            .custom-import-panel__actions {
+                width: 100%;
+                justify-content: stretch;
+            }
         }
 
         h6 {
@@ -382,6 +401,262 @@
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
+        }
+
+        .custom-blocksets {
+            border: 1px solid var(--soft-border);
+            border-radius: 22px;
+            padding: 1.1rem;
+            background: rgba(3, 5, 16, 0.8);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .custom-blocksets__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.9rem;
+        }
+
+        .custom-blocksets__hint {
+            margin: 0.2rem 0 0;
+            font-size: 0.82rem;
+            color: var(--muted);
+        }
+
+        .custom-blocksets__body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+
+        .custom-blocksets__label {
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .custom-blocksets__select,
+        .custom-blocksets__input,
+        .custom-blocksets__textarea {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid var(--soft-border);
+            background: rgba(255, 255, 255, 0.04);
+            color: #fff;
+            padding: 0.65rem 0.9rem;
+            font-size: 1rem;
+            font-family: 'Space Grotesk', 'IBM Plex Sans', sans-serif;
+        }
+
+        .custom-blocksets__textarea {
+            min-height: 70px;
+            resize: vertical;
+        }
+
+        .custom-blocksets__field-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.65rem;
+        }
+
+        .custom-blocksets__meta-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .custom-blocksets__empty {
+            border: 1px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 1rem;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .custom-blocksets__empty button {
+            margin-top: 0.85rem;
+        }
+
+        .custom-shape-builder {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 18px;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .custom-shape-builder__fields {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .custom-shape-builder__editor {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .custom-shape-blueprint {
+            min-height: 120px;
+            font-family: 'JetBrains Mono', 'Space Mono', monospace;
+            line-height: 1.3;
+            letter-spacing: 0.02em;
+        }
+
+        .custom-shape-preview {
+            border: 1px dashed rgba(255, 255, 255, 0.25);
+            border-radius: 14px;
+            min-height: 130px;
+            padding: 0.6rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+
+        .rotation-option-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .shape-rotation-option {
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 0.5rem;
+            background: rgba(6, 9, 22, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            cursor: pointer;
+            transition: border 0.18s ease, background 0.18s ease;
+        }
+
+        .shape-rotation-option__label {
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .shape-rotation-option__preview {
+            min-height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0.2rem;
+            flex-wrap: wrap;
+        }
+
+        .shape-rotation-option--selected {
+            border-color: var(--accent);
+            background: rgba(255, 183, 3, 0.08);
+        }
+
+        .shape-rotation-option--disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .custom-shape-status {
+            min-height: 1.2rem;
+            font-size: 0.82rem;
+            color: var(--danger);
+        }
+
+        .custom-shape-status.is-success {
+            color: var(--accent);
+        }
+
+        .custom-shape-builder__actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+
+        .custom-shape-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+
+        .custom-shape-card {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 0.85rem;
+            background: rgba(6, 8, 20, 0.65);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .custom-shape-card__meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .custom-shape-card__label {
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .custom-shape-card__rotations {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .rotation-chip {
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.25rem 0.7rem;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            background: transparent;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.15s ease, border 0.15s ease;
+        }
+
+        .rotation-chip.is-active {
+            border-color: var(--accent);
+            background: rgba(255, 183, 3, 0.12);
+            color: var(--accent);
+        }
+
+        .rotation-chip.is-disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .custom-import-panel {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 18px;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .custom-import-panel__actions {
+            display: flex;
+            justify-content: flex-end;
         }
 
         .blockset-card {
@@ -755,6 +1030,75 @@
                 </summary>
                 <div class="blockset-panel__content">
                     <div id="blockset-list" class="blockset-list" role="list"></div>
+                    <section class="custom-blocksets" aria-labelledby="custom-blocksets-heading">
+                        <div class="custom-blocksets__header">
+                            <div>
+                                <h6 id="custom-blocksets-heading">Custom Block Sets</h6>
+                                <p class="custom-blocksets__hint">Design new collections, preview rotations, and store them in your browser.</p>
+                            </div>
+                            <button type="button" id="custom-blockset-create" class="ghost-button ghost-button--compact">New Set</button>
+                        </div>
+                        <div class="custom-blocksets__body" id="custom-blocksets-body">
+                            <label class="custom-blocksets__label" for="custom-blockset-select">Select set</label>
+                            <select id="custom-blockset-select" class="custom-blocksets__select"></select>
+                            <div class="custom-blocksets__field-grid">
+                                <div>
+                                    <label class="custom-blocksets__label" for="custom-blockset-name">Name</label>
+                                    <input type="text" id="custom-blockset-name" class="custom-blocksets__input" placeholder="Night Shift" autocomplete="off" spellcheck="false">
+                                </div>
+                                <div>
+                                    <label class="custom-blocksets__label" for="custom-blockset-description">Description</label>
+                                    <textarea id="custom-blockset-description" class="custom-blocksets__textarea" placeholder="High-risk diagonal clears."></textarea>
+                                </div>
+                            </div>
+                            <div class="custom-blocksets__meta-actions">
+                                <button type="button" id="custom-blockset-save" class="accent-button" disabled>Save Changes</button>
+                                <button type="button" id="custom-blockset-delete" class="danger-button" disabled>Delete Set</button>
+                            </div>
+                            <div class="custom-shape-builder">
+                                <div class="custom-shape-builder__fields">
+                                    <label class="custom-blocksets__label" for="custom-shape-label">Shape label</label>
+                                    <input type="text" id="custom-shape-label" class="custom-blocksets__input" placeholder="Slicer" autocomplete="off" spellcheck="false">
+                                </div>
+                                <div class="custom-shape-builder__editor">
+                                    <div>
+                                        <label class="custom-blocksets__label" for="custom-shape-blueprint">Blueprint</label>
+                                        <textarea id="custom-shape-blueprint" class="custom-blocksets__textarea custom-shape-blueprint" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="##&#10;.#"></textarea>
+                                    </div>
+                                    <div>
+                                        <label class="custom-blocksets__label">Live preview</label>
+                                        <div id="custom-shape-preview" class="custom-shape-preview" aria-live="polite"></div>
+                                    </div>
+                                </div>
+                                <p class="custom-blocksets__hint">Use #, X, or 1 for filled cells. Duplicate rotations are dimmed automatically.</p>
+                                <div id="custom-shape-rotations" class="rotation-option-list" aria-live="polite"></div>
+                                <div class="custom-shape-builder__actions">
+                                    <span id="custom-shape-status" class="custom-shape-status"></span>
+                                    <button type="button" id="custom-shape-add" class="primary-button" disabled>Add Shape</button>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="custom-blocksets__label">Shapes in this set</p>
+                                <div id="custom-shape-list" class="custom-shape-list" aria-live="polite"></div>
+                            </div>
+                            <div class="custom-import-panel">
+                                <div class="custom-import-panel__header">
+                                    <h6>Import from another set</h6>
+                                    <p class="custom-blocksets__hint">Copy every shape (and its allowed rotations) from another block set, then prune individual pieces below.</p>
+                                </div>
+                                <label class="custom-blocksets__label" for="custom-import-source">Source block set</label>
+                                <select id="custom-import-source" class="custom-blocksets__select"></select>
+                                <p id="custom-import-hint" class="custom-blocksets__hint"></p>
+                                <div class="custom-import-panel__actions">
+                                    <button type="button" id="custom-import-apply" class="ghost-button" disabled>Import Block Set</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="custom-blocksets__empty" id="custom-blocksets-empty" hidden>
+                            <p>Create your first custom block set to get started.</p>
+                            <button type="button" class="accent-button" id="custom-blockset-empty-create">Create a Set</button>
+                        </div>
+                    </section>
                 </div>
             </details>
             <details id="shader-panel" class="shader-panel" open>

@@ -2002,6 +2002,7 @@ const handleBlockSetSelection = (blockSetId) => {
     activeBlockSetId = blockSetId;
     localStorage.setItem(ACTIVE_BLOCK_SET_KEY, activeBlockSetId);
     game.setBlockSet(blockSetId);
+    ensureActiveCardVisibility();
     updateBlockSetCardState();
 };
 const renderBlockSetControls = () => {
@@ -2013,10 +2014,14 @@ const renderBlockSetControls = () => {
     blockSetCards.clear();
     const snapshot = highScoreStore.getSnapshot();
     for (const blockSet of blockSetData) {
-        const card = document.createElement("button");
-        card.type = "button";
+        const card = document.createElement("details");
         card.className = "blockset-card";
         card.dataset.blockSetId = blockSet.id;
+        if (blockSet.id === activeBlockSetId) {
+            card.open = true;
+        }
+        const summary = document.createElement("summary");
+        summary.className = "blockset-card__summary";
         const meta = document.createElement("div");
         meta.className = "blockset-card__meta";
         const name = document.createElement("span");
@@ -2028,6 +2033,29 @@ const renderBlockSetControls = () => {
         scoreLabel.textContent = `High: ${setScore}`;
         meta.appendChild(name);
         meta.appendChild(scoreLabel);
+        const selectButton = document.createElement("button");
+        selectButton.type = "button";
+        selectButton.className = "ghost-button blockset-card__select";
+        const isActiveSet = blockSet.id === activeBlockSetId;
+        selectButton.textContent = isActiveSet ? "Active Set" : "Use This Set";
+        selectButton.disabled = isActiveSet;
+        selectButton.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            handleBlockSetSelection(blockSet.id);
+        });
+        const chevron = document.createElement("span");
+        chevron.className = "blockset-card__chevron";
+        chevron.setAttribute("aria-hidden", "true");
+        const summaryActions = document.createElement("div");
+        summaryActions.className = "blockset-card__summary-actions";
+        summaryActions.appendChild(selectButton);
+        summaryActions.appendChild(chevron);
+        summary.appendChild(meta);
+        summary.appendChild(summaryActions);
+        card.appendChild(summary);
+        const content = document.createElement("div");
+        content.className = "blockset-card__content";
         const description = document.createElement("p");
         description.className = "blockset-card__hint";
         description.textContent = blockSet.description;
@@ -2037,20 +2065,20 @@ const renderBlockSetControls = () => {
         previewShapes.forEach(shape => {
             preview.appendChild(createShapePreview(shape));
         });
-        card.appendChild(meta);
-        card.appendChild(description);
-        card.appendChild(preview);
-        card.addEventListener("click", () => handleBlockSetSelection(blockSet.id));
+        content.appendChild(description);
+        content.appendChild(preview);
+        card.appendChild(content);
         blockSetList.appendChild(card);
-        blockSetCards.set(blockSet.id, { card, scoreLabel });
+        blockSetCards.set(blockSet.id, { card, scoreLabel, selectButton });
     }
     updateBlockSetCardState();
 };
 const updateBlockSetCardState = () => {
-    blockSetCards.forEach(({ card }, id) => {
+    blockSetCards.forEach(({ card, selectButton }, id) => {
         const isActive = id === activeBlockSetId;
         card.classList.toggle("blockset-card--active", isActive);
-        card.setAttribute("aria-pressed", isActive ? "true" : "false");
+        selectButton.textContent = isActive ? "Active Set" : "Use This Set";
+        selectButton.disabled = isActive;
     });
 };
 const updateBlockSetScores = (perSet) => {
@@ -2058,6 +2086,11 @@ const updateBlockSetScores = (perSet) => {
         var _a;
         const nextScore = (_a = perSet[id]) !== null && _a !== void 0 ? _a : 0;
         scoreLabel.textContent = `High: ${nextScore}`;
+    });
+};
+const ensureActiveCardVisibility = () => {
+    blockSetCards.forEach(({ card }, id) => {
+        card.open = id === activeBlockSetId;
     });
 };
 const createShapePreview = (shape) => {
@@ -2112,6 +2145,7 @@ document.addEventListener("keydown", (event) => {
 });
 window.addEventListener("resize", () => scheduleLayoutRefresh());
 renderBlockSetControls();
+ensureActiveCardVisibility();
 document.addEventListener("blockgame:scores", (event) => {
     const scoreEvent = event;
     if (!scoreEvent.detail) {
